@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LWMC Fleet Console — Lahore Division</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<style>
+  :root{
+    --bg:#eefaf6; --panel:rgba(255,255,255,.58); --panel2:rgba(240,250,246,.72); --line:rgba(18,50,41,.14);
+    --ink:#123229; --mut:#557b70; --dim:#84a89c;
+    --moving:#16a34a; --still:#d97706; --idle:#2563eb; --off:#dc2626;
+    --accent:#0d9488; --accent2:#0f766e;
+    --well:rgba(18,50,41,.055); --glass-blur:18px;
+    --shadow:0 1px 2px rgba(18,50,41,.06), 0 14px 30px -18px rgba(18,50,41,.28);
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Roboto Mono",Menlo,Consolas,monospace;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);overflow:hidden;
+       background-image:radial-gradient(1100px 620px at 12% -8%, #d5f3e6 0%, transparent 60%),
+                         radial-gradient(900px 540px at 100% 0%, #d7ecfa 0%, transparent 55%),
+                         radial-gradient(820px 520px at 45% 105%, #fbf0d9 0%, transparent 60%)}
+  .app{display:grid;grid-template-rows:auto 1fr auto;height:100vh}
+
+  /* topbar */
+  .top{display:flex;align-items:center;gap:18px;padding:12px 20px;
+       background:rgba(255,255,255,.55);backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+       -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+       border-bottom:1px solid var(--line);
+       box-shadow:0 1px 0 #ffffffb0 inset, var(--shadow)}
+  .mark{width:30px;height:30px;border-radius:9px;flex:0 0 auto;
+        background:linear-gradient(155deg,var(--accent),var(--accent2));
+        display:flex;align-items:center;justify-content:center;
+        font-family:var(--mono);font-weight:800;font-size:12px;color:#eefdf8;
+        box-shadow:0 4px 14px -4px #0d948880}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .txt{display:flex;flex-direction:column;line-height:1.15}
+  .brand b{font-size:15px;letter-spacing:.3px;color:var(--ink)}
+  .brand span{font-size:11px;color:var(--mut);letter-spacing:.5px;text-transform:uppercase}
+  .snap{font-family:var(--mono);font-size:12px;color:var(--accent2);
+        border:1px solid var(--line);padding:4px 10px;border-radius:8px;background:rgba(255,255,255,.55);
+        display:flex;align-items:center;gap:7px}
+  .snap .dot-live{width:6px;height:6px;border-radius:50%;background:var(--moving);
+        box-shadow:0 0 0 3px #16a34a2e}
+  .legend{margin-left:auto;display:flex;gap:16px;font-size:12px;color:var(--mut)}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .icon{width:14px;height:14px;vertical-align:-2px;margin-right:6px;opacity:.85}
+
+  /* body split: filters | main content | detail rail */
+  .mid{display:grid;grid-template-columns:328px minmax(0,1fr) 356px;min-height:0}
+  .side{background:rgba(255,255,255,.45);backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+        -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+        border-right:1px solid var(--line);
+        overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:16px}
+  .right{background:rgba(255,255,255,.45);backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+        -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+        border-left:1px solid var(--line);
+        overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:14px}
+  .content{min-width:0;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:14px}
+  #map{width:100%;height:360px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+  .panel{background:var(--panel);backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+         -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+         border:1px solid var(--line);border-radius:16px;padding:14px;
+         box-shadow:var(--shadow)}
+  .panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .panel-head b{font-size:13px;letter-spacing:.25px;display:flex;align-items:center;color:var(--ink)}
+  .panel-head span{font-size:11px;color:var(--mut)}
+  .card-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+  .mini-card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;
+             min-height:82px;transition:.15s;position:relative;overflow:hidden}
+  .mini-card::before{content:"";position:absolute;inset:0 0 auto 0;height:2px;
+             background:linear-gradient(90deg,var(--accent),transparent)}
+  .mini-card:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--shadow)}
+  .mini-card .n{font-family:var(--mono);font-size:23px;font-weight:700;color:var(--accent2)}
+  .mini-card .l{font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-top:3px}
+  .mini-card .s{font-size:11.5px;color:var(--ink);margin-top:6px;line-height:1.4}
+
+  /* fleet health gauge */
+  .health{display:flex;align-items:center;gap:16px}
+  .gauge{width:96px;height:96px;border-radius:50%;flex:0 0 auto;display:flex;
+         align-items:center;justify-content:center;position:relative}
+  .gauge .ring{position:absolute;inset:0;border-radius:50%}
+  .gauge .hole{position:absolute;inset:10px;border-radius:50%;background:var(--panel2);
+        border:1px solid var(--line);display:flex;flex-direction:column;
+        align-items:center;justify-content:center}
+  .gauge .hole b{font-family:var(--mono);font-size:20px;line-height:1}
+  .gauge .hole span{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+  .health-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+  .health-verdict{font-size:12.5px;font-weight:700}
+  .health-sub{font-size:11px;color:var(--mut);line-height:1.5}
+  .alert-list{display:flex;flex-direction:column;gap:8px}
+  .alert{display:flex;gap:9px;align-items:flex-start;background:var(--panel2);
+         border:1px solid var(--line);border-left:3px solid var(--accent);
+         border-radius:10px;padding:9px 10px;font-size:11.5px;line-height:1.45;color:var(--ink)}
+  .alert.warn{border-left-color:var(--still)}
+  .alert.crit{border-left-color:var(--off)}
+  .alert .n{font-family:var(--mono);font-weight:700;color:var(--ink);flex:0 0 auto}
+  .report-box{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;
+        font-family:var(--mono);font-size:10.5px;line-height:1.6;color:var(--ink);
+        white-space:pre-wrap;word-break:break-word;max-height:280px;overflow-y:auto;margin:0}
+  .two-col{display:grid;grid-template-columns:1.2fr .8fr;gap:12px}
+  .chart-block{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+  .chart-row{display:grid;grid-template-columns:110px 1fr 48px;gap:10px;align-items:center}
+  .chart-label{font-size:11.5px;color:var(--ink)}
+  .chart-bar{height:10px;background:var(--well);border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .chart-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--moving));border-radius:999px}
+  .chart-fill.warn{background:linear-gradient(90deg,var(--still),#b45309)}
+  .chart-fill.off{background:linear-gradient(90deg,var(--off),#b91c1c)}
+  .chart-value{font-family:var(--mono);font-size:11px;color:var(--mut);text-align:right}
+  .detail-box{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;flex:1;min-height:0}
+  .detail-line{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-bottom:1px solid rgba(18,50,41,.09);font-size:11.5px}
+  .detail-line:last-child{border-bottom:none}
+  .detail-line .k{color:var(--mut)}
+  .detail-line .v{font-family:var(--mono);text-align:right;color:var(--ink)}
+
+  /* KPI grid */
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 11px}
+  .kpi .n{font-family:var(--mono);font-size:20px;font-weight:600;color:var(--ink)}
+  .kpi .l{font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+  .kpi.wide{grid-column:1/3}
+  .kpi.wide .n{font-size:22px;color:var(--accent2)}
+
+  .sect{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;
+        margin:2px 0 -4px;font-weight:600}
+
+  /* district rail (signature) */
+  .rail{display:flex;flex-direction:column;gap:6px}
+  .drow{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;
+        cursor:pointer;transition:.15s;position:relative;overflow:hidden}
+  .drow:hover{border-color:var(--accent)}
+  .drow.active{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .drow .dh{display:flex;justify-content:space-between;align-items:baseline}
+  .drow .dn{font-size:12.5px;font-weight:600;color:var(--ink)}
+  .drow .dc{font-family:var(--mono);font-size:12px;color:var(--mut)}
+  .bar{height:5px;border-radius:3px;background:var(--well);margin-top:7px;display:flex;overflow:hidden}
+  .bar .mv{background:var(--moving)}
+  .bar .st{background:var(--still)}
+  .drow small{font-family:var(--mono);font-size:10px;color:var(--dim);display:block;margin-top:5px}
+
+  /* date block */
+  .date-block{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+              padding:10px 11px;display:flex;flex-direction:column;gap:4px}
+  .date-block .d{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--accent2)}
+  .date-block .s{font-size:11px;color:var(--mut);line-height:1.5}
+
+  /* filters */
+  .filt{display:flex;flex-direction:column;gap:10px}
+  .time-range{display:flex;align-items:center;gap:6px}
+  .time-range input{width:auto;flex:1}
+  .time-range span{font-size:11px;color:var(--dim)}
+  .filter-group{display:flex;flex-direction:column;gap:6px}
+  .filter-label{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+  select,input{width:100%;background:rgba(255,255,255,.55);color:var(--ink);border:1px solid var(--line);
+        border-radius:9px;padding:8px 10px;font-size:12.5px;font-family:var(--sans)}
+  input::placeholder{color:var(--dim)}
+  .chips{display:flex;gap:6px}
+  .chip{flex:1;text-align:center;padding:7px 0;border:1px solid var(--line);border-radius:9px;
+        font-size:11.5px;cursor:pointer;color:var(--mut);background:rgba(255,255,255,.4);user-select:none}
+  .chip.on{color:#fff;font-weight:700;border-color:transparent}
+  .chip[data-s="moving"].on{background:var(--moving)}
+  .chip[data-s="still"].on{background:var(--still)}
+  .chip[data-s="all"].on{background:var(--accent)}
+  .reset{background:rgba(255,255,255,.4);border:1px solid var(--line);color:var(--mut);border-radius:9px;
+         padding:7px;font-size:12px;cursor:pointer}
+  .reset:hover{color:var(--ink);border-color:var(--accent)}
+  .filter-summary{font-size:11px;color:var(--mut);line-height:1.5;padding:8px 10px;
+                  border:1px solid var(--line);border-radius:9px;background:rgba(255,255,255,.4)}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;
+        border:1px solid var(--line);background:rgba(255,255,255,.5);font-size:10.5px;color:var(--mut)}
+  .pill.ok{color:#0f7a3c;border-color:#bfe8cf;background:#eefaf0}
+  .pill.off{color:#b91c1c;border-color:#f3c6c6;background:#fdefef}
+  .pill.warn{color:#a15c05;border-color:#f0dcb0;background:#fdf6e6}
+  .pophead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .popmeta{margin-top:2px;font-size:11px;color:var(--mut)}
+
+  /* table */
+  .bottom{background:rgba(255,255,255,.5);backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+        -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+        border-top:1px solid var(--line);height:230px;display:flex;flex-direction:column}
+  .thead{display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--line)}
+  .thead b{font-size:12px;letter-spacing:.3px;color:var(--ink)}
+  .thead .cnt{font-family:var(--mono);font-size:12px;color:var(--accent2)}
+  .thead .hint{margin-left:auto;font-size:11px;color:var(--dim)}
+  .twrap{overflow:auto;flex:1}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  thead th{position:sticky;top:0;background:var(--panel2);color:var(--mut);text-align:left;
+           padding:7px 12px;font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;
+           cursor:pointer;white-space:nowrap;border-bottom:1px solid var(--line)}
+  thead th:hover{color:var(--ink)}
+  tbody td{padding:6px 12px;border-bottom:1px solid rgba(18,50,41,.08);white-space:nowrap;color:var(--ink)}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:rgba(13,148,136,.08)}
+  .num{font-family:var(--mono);text-align:right}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .tag{font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.6);color:var(--mut);border:1px solid var(--line)}
+
+  .leaflet-popup-content-wrapper{background:rgba(255,255,255,.92);color:var(--ink);border-radius:10px;border:1px solid var(--line);box-shadow:var(--shadow)}
+  .leaflet-popup-tip{background:rgba(255,255,255,.92)}
+  .pop b{font-size:13px}
+  .pop table{font-size:11.5px;margin-top:6px}
+  .pop td{padding:2px 8px 2px 0;border:none;color:var(--mut)}
+  .pop td.v{color:var(--ink);font-family:var(--mono);text-align:left}
+  .note{font-size:10.5px;color:var(--dim);line-height:1.5}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:rgba(18,50,41,.22);border-radius:5px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="brand">
+      <div class="mark">LW</div>
+      <div class="txt"><b>LWMC Fleet Console</b><span>Lahore Division · live vehicle tracking</span></div>
+    </div>
+    <div class="snap" id="snap"><span class="dot-live"></span>—</div>
+    <div class="legend">
+      <span><i style="background:var(--moving)"></i>Moving</span>
+      <span><i style="background:var(--still)"></i>Still / parked</span>
+      <span><i style="background:var(--accent);border-radius:2px"></i>UC boundary</span>
+    </div>
+  </div>
+
+  <div class="mid">
+    <aside class="side">
+      <div class="kpis" id="kpis"></div>
+
+      <div class="sect">Date</div>
+      <div class="date-block" id="dateBlock"></div>
+
+      <div class="sect">Districts</div>
+      <div class="rail" id="rail"></div>
+
+      <div class="sect">Filters</div>
+      <div class="filt">
+        <div class="filter-group">
+          <div class="filter-label">Fleet status</div>
+          <div class="chips" id="statusChips">
+            <div class="chip on" data-s="all">All</div>
+            <div class="chip" data-s="moving">Moving</div>
+            <div class="chip" data-s="still">Still</div>
+          </div>
+        </div>
+        <div class="filter-group">
+          <div class="filter-label">Recent activity</div>
+          <div class="chips" id="recentChips">
+            <div class="chip on" data-r="all">All</div>
+            <div class="chip" data-r="4">4h</div>
+            <div class="chip" data-r="6">6h</div>
+            <div class="chip" data-r="8">8h</div>
+          </div>
+        </div>
+        <div class="filter-group">
+          <div class="filter-label">Connectivity</div>
+          <div class="chips" id="connChips">
+            <div class="chip on" data-c="all">All</div>
+            <div class="chip" data-c="online">Online</div>
+            <div class="chip" data-c="offline">Offline</div>
+          </div>
+        </div>
+        <div class="filter-group">
+          <div class="filter-label">Snapshot date</div>
+          <select id="dateSel"><option value="">All dates</option></select>
+        </div>
+        <div class="filter-group">
+          <div class="filter-label">Time of day (last seen)</div>
+          <div class="time-range">
+            <input type="time" id="timeFrom">
+            <span>to</span>
+            <input type="time" id="timeTo">
+          </div>
+        </div>
+        <div class="filter-group">
+          <div class="filter-label">UC</div>
+          <select id="ucSel"><option value="">All UCs</option></select>
+        </div>
+        <div class="filter-group">
+          <div class="filter-label">Vehicle type</div>
+          <select id="typeSel"><option value="">All vehicle types</option></select>
+        </div>
+        <div class="filter-group">
+          <div class="filter-label">Search</div>
+          <input id="search" placeholder="Search vehicle no…">
+        </div>
+        <div class="filter-summary" id="filterSummary">Use recency, connectivity, and UC filters to narrow the fleet.</div>
+        <button class="reset" id="reset">Reset filters</button>
+      </div>
+
+      <div class="sect">Coverage note</div>
+      <div class="note">UC boundaries exist for Lahore city only. Kasur, Sheikhupura &amp; Nankana Sahib
+        vehicles are shown in written form here; use the UC filter to separate city-bound fleet from outside points.</div>
+    </aside>
+
+    <main class="content">
+      <section class="panel">
+        <div class="panel-head">
+          <b>Map</b>
+          <span>coverage, markers, and popups</span>
+        </div>
+        <div id="map"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <b>Written Snapshot</b>
+          <span id="snapshotNote">Fleet summary and the latest counts</span>
+        </div>
+        <div class="card-grid" id="overviewCards"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <b>Charts</b>
+          <span>text-first charts built from the current filtered fleet</span>
+        </div>
+        <div class="two-col">
+          <div class="chart-block">
+            <div class="filter-label">Status mix</div>
+            <div id="statusChart"></div>
+          </div>
+          <div class="chart-block">
+            <div class="filter-label">Recency buckets</div>
+            <div id="recencyChart"></div>
+          </div>
+        </div>
+        <div style="height:10px"></div>
+        <div class="chart-block">
+          <div class="filter-label">District distribution</div>
+          <div id="districtChart"></div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="right">
+      <section class="panel">
+        <div class="panel-head">
+          <b>Fleet health</b>
+          <span>composite score</span>
+        </div>
+        <div class="health" id="health"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <b>Predictions &amp; alerts</b>
+          <span>rule-based</span>
+        </div>
+        <div class="alert-list" id="predictionList"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <b>Output report</b>
+          <span id="reportMeta">written summary of the current view</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="reset" id="genReport" style="flex:1">Generate report</button>
+          <button class="reset" id="dlReport" style="flex:1">Download .txt</button>
+        </div>
+        <pre class="report-box" id="reportBox">Click "Generate report" to compile a written report from the vehicles currently in view (respects all filters above).</pre>
+      </section>
+
+      <section class="panel" style="flex:1;min-height:260px;display:flex;flex-direction:column">
+        <div class="panel-head">
+          <b>Selected record</b>
+          <span id="selectedHint">click map or table</span>
+        </div>
+        <div class="detail-box" id="selectedDetail" style="overflow-y:auto"></div>
+      </section>
+    </aside>
+  </div>
+
+  <div class="bottom">
+    <div class="thead">
+      <b>Fleet</b><span class="cnt" id="tcount">0</span>
+      <span class="hint">click a row to open the written record below · click a header to sort</span>
+    </div>
+    <div class="twrap">
+      <table>
+        <thead><tr id="thr"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+const DATA = /*DATA*/;
+</script>
+<script>
+const STATUS_COLOR = {moving:'#16a34a', still:'#d97706', idle:'#2563eb'};
+const DISTRICT_ORDER = ['Lahore','Kasur','Sheikhupura','Nankana Sahib'];
+const RAW_FIELD_LABELS = {
+  vehicle_id:'Vehicle ID', vehicle:'Vehicle', vkey:'Vehicle key', district:'District',
+  office:'Office', tehsil_code:'Tehsil code', vehicle_type:'Vehicle type', used_for:'Used for',
+  status:'Status', engine:'Engine', distance_km:'Distance (km)', working_min:'Working (min)',
+  lat:'Latitude', lon:'Longitude', timestamp:'Timestamp', last_received:'Last received',
+  reporting_status:'Reporting status', status_text:'Status text', battery_volt:'Battery (V)',
+  tracker_offline:'Tracker offline', uc:'UC', uc_town:'UC town', uc_zone:'UC zone', snapshot:'Snapshot date',
+};
+function rawValue(v){
+  if(v===null||v===undefined||v==='') return '\u2014';
+  if(typeof v==='boolean') return v?'Yes':'No';
+  if(typeof v==='number') return Number.isInteger(v)?String(v):v.toFixed(2);
+  return String(v);
+}
+function rawRecordPairs(p){
+  return Object.entries(RAW_FIELD_LABELS)
+    .filter(([k])=>k in p)
+    .map(([k,label])=>[label, rawValue(p[k])]);
+}
+function rawRecordTableHtml(p){
+  return rawRecordPairs(p).map(([k,v])=>`<tr><td>${k}</td><td class="v">${v}</td></tr>`).join('');
+}
+function rawRecordDetailHtml(p){
+  return rawRecordPairs(p).map(([k,v])=>`<div class="detail-line"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+}
+let state = {district:null, status:'all', recent:'all', conn:'all', uc:'', type:'', q:'',
+  date:'', timeFrom:'', timeTo:'', sort:'distance_km', dir:-1, selected:null};
+function parseLastReceived(value){
+  if(!value || value==='-') return null;
+  const m = String(value).trim().match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{1,2}):(\d{2}) (AM|PM)$/);
+  if(!m) return null;
+  let hh = +m[4];
+  const mm = +m[5];
+  if(m[6] === 'PM' && hh !== 12) hh += 12;
+  if(m[6] === 'AM' && hh === 12) hh = 0;
+  return new Date(+m[3], +m[2] - 1, +m[1], hh, mm);
+}
+const POINTS = DATA.points.map(p => ({...p, last_received_ts: parseLastReceived(p.last_received)}));
+DATA.points = POINTS;
+const referenceTime = POINTS.reduce((acc, p) => p.last_received_ts && (!acc || p.last_received_ts > acc) ? p.last_received_ts : acc, null) || new Date();
+const ucOptions = [...new Map(POINTS.filter(p => p.uc).map(p => [p.uc, p])).values()]
+  .sort((a,b) => a.uc.localeCompare(b.uc, undefined, {numeric:true}))
+  .map(p => ({value: p.uc, label: `${p.uc} · ${p.uc_town || p.district}`}));
+function ageHours(p){
+  if(!p.last_received_ts) return Infinity;
+  return (referenceTime - p.last_received_ts) / 36e5;
+}
+function isOnline(p){
+  if(p.reporting_status === 'Reporting') return true;
+  if(p.reporting_status === 'Not Reporting') return false;
+  const age = ageHours(p);
+  return Number.isFinite(age) && age <= 8;
+}
+function ageLabel(p){
+  const h = ageHours(p);
+  if(!Number.isFinite(h)) return 'unknown';
+  if(h < 1) return `${Math.round(h * 60)} min ago`;
+  return `${h.toFixed(h < 10 ? 1 : 0)} h ago`;
+}
+
+document.getElementById('snap').innerHTML = '<span class="dot-live"></span>Snapshot ' + DATA.snapshot;
+document.getElementById('ucSel').innerHTML = '<option value="">All UCs</option><option value="outside">Outside UC</option>' +
+  ucOptions.map(u => `<option value="${u.value}">${u.label}</option>`).join('');
+const dateOptions = [...new Set(POINTS.map(p=>p.snapshot).filter(Boolean))].sort();
+document.getElementById('dateSel').innerHTML = '<option value="">All dates</option>' +
+  dateOptions.map(d => `<option value="${d}">${d}</option>`).join('');
+if(dateOptions.length === 1){ state.date = dateOptions[0]; document.getElementById('dateSel').value = dateOptions[0]; }
+
+// ---- map ----
+const map = L.map('map',{preferCanvas:true, zoomControl:true}).setView([31.52,74.06],9);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  {attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:19}).addTo(map);
+
+// UC polygons
+const ucLayer = L.geoJSON(DATA.ucs,{
+  style:{color:'#0d9488', weight:1.2, opacity:.55, fillColor:'#0d9488', fillOpacity:.06},
+  onEachFeature:(f,l)=>{
+    const s = DATA.uc_stats[f.properties.uc] || {vehicles:0,moving:0,dist:0};
+    l.bindTooltip(`<b>${f.properties.uc}</b> · ${f.properties.town}<br>${s.vehicles} vehicles · ${s.moving} moving`,{sticky:true});
+    l.on('mouseover',()=>l.setStyle({opacity:.8,fillOpacity:.12}));
+    l.on('mouseout',()=>l.setStyle({opacity:.35,fillOpacity:.04}));
+  }
+}).addTo(map);
+
+const markerLayer = L.layerGroup().addTo(map);
+
+function fmt(n,d=0){ return (n==null||isNaN(n))?'—':Number(n).toLocaleString(undefined,{maximumFractionDigits:d,minimumFractionDigits:d}); }
+
+function popupHtml(p){
+  const conn = isOnline(p) ? 'Online' : 'Offline';
+  const connClass = isOnline(p) ? 'ok' : 'off';
+  const rows = [
+    ['District', p.district],
+    ['UC / Town', p.uc ? `${p.uc} · ${p.uc_town}` : '—'],
+    ['Type', p.vehicle_type||'—'],
+    ['Used for', p.used_for||'—'],
+    ['Status', p.status],
+    ['Engine', p.engine],
+    ['Connectivity', conn],
+    ['Age', ageLabel(p)],
+    ['Distance (km)', fmt(p.distance_km,2)],
+    ['Working (min)', fmt(p.working_min,0)],
+    ['Battery (V)', p.battery_volt!=null?fmt(p.battery_volt,1):'—'],
+    ['Reporting', p.reporting_status||'—'],
+    ['Last received', p.last_received||'—'],
+  ];
+  return `<div class="pop"><div class="pophead"><b>${p.vehicle}</b><span class="pill ${connClass}">${conn}</span></div><div class="popmeta">${p.district} · ${p.vehicle_type||'—'} · ${ageLabel(p)}</div><table>`+
+    rows.map(r=>`<tr><td>${r[0]}</td><td class="v">${r[1]}</td></tr>`).join('')+`</table>`+
+    `<details style="margin-top:6px"><summary style="cursor:pointer;color:var(--mut);font-size:11px">Raw record (all fields)</summary><table>`+rawRecordTableHtml(p)+`</table></details></div>`;
+}
+
+// ---- filtering ----
+function timeOfDayMinutes(p){
+  if(!p.last_received_ts) return null;
+  return p.last_received_ts.getHours()*60 + p.last_received_ts.getMinutes();
+}
+function toMinutes(hhmm){
+  if(!hhmm) return null;
+  const [h,m] = hhmm.split(':').map(Number);
+  return h*60+m;
+}
+function filtered(){
+  const from = toMinutes(state.timeFrom), to = toMinutes(state.timeTo);
+  return POINTS.filter(p=>{
+    if(state.district && p.district!==state.district) return false;
+    if(state.status!=='all' && p.status!==state.status) return false;
+    if(state.recent!=='all' && ageHours(p) > +state.recent) return false;
+    if(state.conn==='online' && !isOnline(p)) return false;
+    if(state.conn==='offline' && isOnline(p)) return false;
+    if(state.date && p.snapshot !== state.date) return false;
+    if(from!=null || to!=null){
+      const tm = timeOfDayMinutes(p);
+      if(tm==null) return false;
+      if(from!=null && tm < from) return false;
+      if(to!=null && tm > to) return false;
+    }
+    if(state.uc){
+      if(state.uc === 'outside'){ if(p.uc) return false; }
+      else if(p.uc !== state.uc) return false;
+    }
+    if(state.type && p.vehicle_type!==state.type) return false;
+    if(state.q && !(p.vehicle||'').toLowerCase().includes(state.q)) return false;
+    return true;
+  });
+}
+
+function drawMarkers(rows){
+  markerLayer.clearLayers();
+  rows.forEach(p=>{
+    if(p.lat==null||p.lon==null) return;
+    const m = L.circleMarker([p.lat,p.lon],{
+      radius:4, color:'#ffffff', weight:1.2,
+      fillColor:STATUS_COLOR[p.status]||'#16a34a', fillOpacity:.95});
+    m.bindPopup(popupHtml(p));
+    m._v = p.vehicle;
+    markerLayer.addLayer(m);
+  });
+}
+
+// ---- table ----
+const COLS = [
+  ['vehicle','Vehicle'],['district','District'],['vehicle_type','Type'],
+  ['status','Status'],['distance_km','Dist (km)'],['working_min','Work (min)'],
+  ['uc','UC'],['battery_volt','Batt V'],['last_received','Last seen']
+];
+function buildHead(){
+  document.getElementById('thr').innerHTML = COLS.map(c=>{
+    const ar = state.sort===c[0] ? (state.dir<0?' ▾':' ▴') : '';
+    const cls = ['distance_km','working_min','battery_volt'].includes(c[0])?'num':'';
+    return `<th data-k="${c[0]}" class="${cls}">${c[1]}${ar}</th>`;
+  }).join('');
+  document.querySelectorAll('#thr th').forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k;
+    if(state.sort===k) state.dir*=-1; else {state.sort=k; state.dir=-1;}
+    render();
+  });
+}
+function drawTable(rows){
+  const s=[...rows].sort((a,b)=>{
+    let x=a[state.sort], y=b[state.sort];
+    if(x==null)x=state.dir<0?-Infinity:Infinity; if(y==null)y=state.dir<0?-Infinity:Infinity;
+    if(typeof x==='string') return state.dir*x.localeCompare(y);
+    return state.dir*((x>y)-(x<y));
+  }).slice(0,600);
+  document.getElementById('tbody').innerHTML = s.map(p=>`
+    <tr data-v="${p.vehicle}">
+      <td>${p.vehicle}</td>
+      <td><span class="tag">${p.district}</span></td>
+      <td>${p.vehicle_type||'—'}</td>
+      <td><span class="dot" style="background:${STATUS_COLOR[p.status]||'#16a34a'}"></span>${p.status}</td>
+      <td class="num">${fmt(p.distance_km,2)}</td>
+      <td class="num">${fmt(p.working_min,0)}</td>
+      <td>${p.uc||'—'}</td>
+      <td class="num">${p.battery_volt!=null?fmt(p.battery_volt,1):'—'}</td>
+      <td>${p.last_received||'—'}</td>
+    </tr>`).join('');
+  document.querySelectorAll('#tbody tr').forEach(tr=>tr.onclick=()=>{
+    state.selected = tr.dataset.v;
+    render();
+  });
+}
+
+// ---- KPIs & rail ----
+function drawKpis(rows){
+  const moving=rows.filter(p=>p.status==='moving').length;
+  const still=rows.filter(p=>p.status==='still').length;
+  const online=rows.filter(p=>isOnline(p)).length;
+  const offline=rows.length-online;
+  const dist=rows.reduce((s,p)=>s+(p.distance_km||0),0);
+  const avg=rows.length?dist/rows.length:0;
+  const k=[
+    ['wide','Vehicles in view', fmt(rows.length)],
+    ['','Moving', fmt(moving)],
+    ['','Still', fmt(still)],
+    ['wide','Total distance today (km)', fmt(dist,0)],
+    ['','Avg dist / veh', fmt(avg,2)],
+    ['','Online / Offline', `${fmt(online)} / ${fmt(offline)}`],
+  ];
+  document.getElementById('kpis').innerHTML = k.map(x=>`
+    <div class="kpi ${x[0]}"><div class="n">${x[2]}</div><div class="l">${x[1]}</div></div>`).join('');
+}
+function drawOverview(rows){
+  const total = rows.length;
+  const moving = rows.filter(p=>p.status==='moving').length;
+  const still = rows.filter(p=>p.status==='still').length;
+  const online = rows.filter(p=>isOnline(p)).length;
+  const offline = total - online;
+  const ucShown = rows.filter(p=>p.uc).length;
+  const outside = total - ucShown;
+  const recent4 = rows.filter(p=>ageHours(p) <= 4).length;
+  const recent6 = rows.filter(p=>ageHours(p) <= 6).length;
+  const recent8 = rows.filter(p=>ageHours(p) <= 8).length;
+  const items = [
+    ['Vehicles', total, `${moving} moving · ${still} still`],
+    ['Connectivity', `${online} / ${offline}`, 'Online / offline split'],
+    ['Recent', `${recent4} / ${recent6} / ${recent8}`, 'Seen in last 4h · 6h · 8h'],
+    ['UC coverage', `${ucShown} / ${outside}`, 'Inside Lahore UC polygons · outside'],
+  ];
+  document.getElementById('overviewCards').innerHTML = items.map(([label, value, sub]) => `
+    <div class="mini-card"><div class="n">${value}</div><div class="l">${label}</div><div class="s">${sub}</div></div>
+  `).join('');
+}
+function drawBars(targetId, rows){
+  document.getElementById(targetId).innerHTML = rows.map(r => {
+    const width = Math.max(4, Math.min(100, r.pct));
+    return `<div class="chart-row">
+      <div class="chart-label">${r.label}</div>
+      <div class="chart-bar"><div class="chart-fill ${r.kind || ''}" style="width:${width}%"></div></div>
+      <div class="chart-value">${r.value}</div>
+    </div>`;
+  }).join('');
+}
+function drawCharts(rows){
+  const movingCount = rows.filter(p=>p.status==='moving').length;
+  const stillCount = rows.filter(p=>p.status==='still').length;
+  drawBars('statusChart', [
+    {label:'Moving', value: fmt(movingCount), pct: rows.length ? 100 * movingCount / rows.length : 0},
+    {label:'Still', value: fmt(stillCount), pct: rows.length ? 100 * stillCount / rows.length : 0, kind:'warn'},
+  ]);
+  const r4 = rows.filter(p=>ageHours(p) <= 4).length;
+  const r6 = rows.filter(p=>ageHours(p) > 4 && ageHours(p) <= 6).length;
+  const r8 = rows.filter(p=>ageHours(p) > 6 && ageHours(p) <= 8).length;
+  const r8p = rows.filter(p=>ageHours(p) > 8 || !Number.isFinite(ageHours(p))).length;
+  drawBars('recencyChart', [
+    {label:'0-4h', value: fmt(r4), pct: rows.length ? 100 * r4 / rows.length : 0},
+    {label:'4-6h', value: fmt(r6), pct: rows.length ? 100 * r6 / rows.length : 0, kind:'warn'},
+    {label:'6-8h', value: fmt(r8), pct: rows.length ? 100 * r8 / rows.length : 0, kind:'warn'},
+    {label:'8h+', value: fmt(r8p), pct: rows.length ? 100 * r8p / rows.length : 0, kind:'off'},
+  ]);
+  drawBars('districtChart', DISTRICT_ORDER.map(d => {
+    const count = rows.filter(p=>p.district===d).length;
+    return {label:d, value: fmt(count), pct: rows.length ? 100 * count / rows.length : 0};
+  }));
+}
+function drawPredictions(rows){
+  const activeSoon = rows.filter(p => ageHours(p) <= 4 && p.status === 'moving').length;
+  const riskOffline = rows.filter(p => !isOnline(p) || ageHours(p) > 8).length;
+  const batteryRisk = rows.filter(p => p.battery_volt != null && p.battery_volt < 2).length;
+  const outside = rows.filter(p => !p.uc).length;
+  const likelyMove = rows.filter(p => p.status === 'still' && ageHours(p) <= 4).slice(0, 3).map(p => p.vehicle);
+  const items = [
+    {n: fmt(activeSoon), kind:'', text:`likely active in the next 4h — already moving and recently reported.`},
+    {n: fmt(riskOffline), kind: riskOffline>0?'crit':'', text:`on the offline watchlist — older than 8h or not reporting.`},
+    {n: fmt(batteryRisk), kind: batteryRisk>0?'warn':'', text:`battery concern — under 2V and should be checked.`},
+    {n: fmt(outside), kind:'', text:`currently outside Lahore UC polygons.`},
+    {n: likelyMove.length, kind:'', text: likelyMove.length ? `possible near-term movers: ${likelyMove.join(', ')}.` : `no near-term movers flagged from the current slice.`},
+  ];
+  document.getElementById('predictionList').innerHTML = items.map(it => `
+    <div class="alert ${it.kind}"><span class="n">${it.n}</span><span>${it.text}</span></div>`).join('');
+}
+function healthColor(score){
+  if(score >= 75) return getComputedStyle(document.documentElement).getPropertyValue('--moving').trim();
+  if(score >= 50) return getComputedStyle(document.documentElement).getPropertyValue('--still').trim();
+  return getComputedStyle(document.documentElement).getPropertyValue('--off').trim();
+}
+function fmtDate(d){
+  const dt = new Date(d+'T00:00:00');
+  return isNaN(dt) ? d : dt.toLocaleDateString(undefined, {weekday:'short', year:'numeric', month:'short', day:'numeric'});
+}
+function drawDateBlock(rows){
+  const dates = [...new Set(rows.map(p=>p.snapshot).filter(Boolean))];
+  const label = state.date ? fmtDate(state.date) : (dates.length===1 ? fmtDate(dates[0]) : dates.length ? `${dates.length} dates in view` : 'No date data');
+  const timeNote = (state.timeFrom || state.timeTo) ? ` · time ${state.timeFrom||'00:00'}–${state.timeTo||'23:59'}` : '';
+  const latestStr = referenceTime.toLocaleTimeString(undefined, {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('dateBlock').innerHTML = `
+    <div class="d">${label}</div>
+    <div class="s">${fmt(rows.length)} vehicles in view${timeNote} · latest update ${latestStr}</div>
+  `;
+}
+function drawHealth(rows){
+  const total = rows.length || 1;
+  const movingPct = rows.filter(p=>p.status==='moving').length / total;
+  const onlinePct = rows.filter(p=>isOnline(p)).length / total;
+  const batteryOkPct = 1 - (rows.filter(p=>p.battery_volt!=null && p.battery_volt<2).length / total);
+  const score = Math.round((movingPct*40 + onlinePct*40 + batteryOkPct*20));
+  const color = healthColor(score);
+  const verdict = score>=75 ? 'Fleet operating well' : score>=50 ? 'Fleet needs attention' : 'Fleet at risk';
+  document.getElementById('health').innerHTML = `
+    <div class="gauge">
+      <div class="ring" style="background:conic-gradient(${color} ${score*3.6}deg, rgba(18,50,41,.1) ${score*3.6}deg)"></div>
+      <div class="hole"><b style="color:${color}">${score}</b><span>/ 100</span></div>
+    </div>
+    <div class="health-body">
+      <div class="health-verdict" style="color:${color}">${verdict}</div>
+      <div class="health-sub">${fmt(Math.round(movingPct*100))}% moving · ${fmt(Math.round(onlinePct*100))}% online · ${fmt(Math.round(batteryOkPct*100))}% battery OK, from ${fmt(rows.length)} vehicles in view.</div>
+    </div>`;
+}
+function drawSelected(rows){
+  const chosen = rows.find(p => p.vehicle === state.selected) || rows[0];
+  const hint = document.getElementById('selectedHint');
+  if(!chosen){
+    hint.textContent = 'click map or table';
+    document.getElementById('selectedDetail').innerHTML = '<div class="detail-line"><span class="k">No vehicle selected</span><span class="v">Use the table below</span></div>';
+    return;
+  }
+  state.selected = chosen.vehicle;
+  hint.textContent = chosen.vehicle;
+  const details = [
+    ['Vehicle', chosen.vehicle],
+    ['District', chosen.district],
+    ['Status', chosen.status],
+    ['Connectivity', isOnline(chosen) ? 'Online' : 'Offline'],
+    ['UC / Town', chosen.uc ? `${chosen.uc} · ${chosen.uc_town || ''}`.trim() : 'Outside UC'],
+    ['Type', chosen.vehicle_type || '—'],
+    ['Used for', chosen.used_for || '—'],
+    ['Distance', fmt(chosen.distance_km, 2) + ' km'],
+    ['Working time', fmt(chosen.working_min, 0) + ' min'],
+    ['Battery', chosen.battery_volt != null ? fmt(chosen.battery_volt, 1) + ' V' : '—'],
+    ['Last received', chosen.last_received || '—'],
+    ['Age', ageLabel(chosen)],
+  ];
+  document.getElementById('selectedDetail').innerHTML = `
+    ${details.map(d => `<div class="detail-line"><span class="k">${d[0]}</span><span class="v">${d[1]}</span></div>`).join('')}
+    <div class="sect" style="margin-top:10px">Raw data</div>
+    ${rawRecordDetailHtml(chosen)}
+  `;
+}
+function drawRail(rowsAll){
+  const rail=document.getElementById('rail');
+  rail.innerHTML = DISTRICT_ORDER.map(d=>{
+    const rows=rowsAll.filter(p=>p.district===d);
+    const mv=rows.filter(p=>p.status==='moving').length;
+    const st=rows.filter(p=>p.status==='still').length;
+    const dist=rows.reduce((s,p)=>s+(p.distance_km||0),0);
+    const tot=rows.length||1;
+    const active = state.district===d?'active':'';
+    return `<div class="drow ${active}" data-d="${d}">
+      <div class="dh"><span class="dn">${d}</span><span class="dc">${rows.length}</span></div>
+      <div class="bar"><span class="mv" style="width:${100*mv/tot}%"></span><span class="st" style="width:${100*st/tot}%"></span></div>
+      <small>${mv} moving · ${fmt(dist,0)} km</small>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.drow').forEach(el=>el.onclick=()=>{
+    state.district = state.district===el.dataset.d ? null : el.dataset.d;
+    render(true);
+  });
+}
+
+// ---- output report ----
+function buildReportText(rows){
+  const moving = rows.filter(p=>p.status==='moving').length;
+  const still = rows.filter(p=>p.status==='still').length;
+  const online = rows.filter(p=>isOnline(p)).length;
+  const dist = rows.reduce((s,p)=>s+(p.distance_km||0),0);
+  const total = rows.length || 1;
+  const movingPct = Math.round(100*moving/total);
+  const onlinePct = Math.round(100*online/total);
+  const battOk = Math.round(100*(1-(rows.filter(p=>p.battery_volt!=null && p.battery_volt<2).length/total)));
+  const score = Math.round(movingPct*0.4 + onlinePct*0.4 + battOk*0.2);
+  const activeSoon = rows.filter(p => ageHours(p) <= 4 && p.status === 'moving').length;
+  const riskOffline = rows.filter(p => !isOnline(p) || ageHours(p) > 8).length;
+  const batteryRisk = rows.filter(p => p.battery_volt != null && p.battery_volt < 2).length;
+  const outside = rows.filter(p => !p.uc).length;
+  const rule = '-'.repeat(40);
+  const lines = [];
+  lines.push('LWMC FLEET CONSOLE — OUTPUT REPORT');
+  lines.push('='.repeat(40));
+  lines.push(`Report period  : ${state.date || DATA.snapshot}${(state.timeFrom||state.timeTo) ? ' · time '+(state.timeFrom||'00:00')+'-'+(state.timeTo||'23:59') : ''}`);
+  lines.push(`Vehicles       : ${fmt(rows.length)} matching current filters (of ${fmt(POINTS.length)} total)`);
+  lines.push(`Generated      : ${referenceTime.toLocaleString()}`);
+  lines.push('');
+  lines.push('FILTERS APPLIED'); lines.push(rule);
+  lines.push(`District       : ${state.district || 'All'}`);
+  lines.push(`Status         : ${state.status}`);
+  lines.push(`Recent activity: ${state.recent==='all' ? 'All' : 'last '+state.recent+'h'}`);
+  lines.push(`Connectivity   : ${state.conn}`);
+  lines.push(`UC             : ${state.uc || 'All'}`);
+  lines.push(`Vehicle type   : ${state.type || 'All'}`);
+  lines.push(`Search         : ${state.q || '(none)'}`);
+  lines.push('');
+  lines.push('SUMMARY'); lines.push(rule);
+  lines.push(`Moving / Still  : ${fmt(moving)} / ${fmt(still)}`);
+  lines.push(`Online / Offline: ${fmt(online)} / ${fmt(rows.length-online)}`);
+  lines.push(`Total distance  : ${fmt(dist,0)} km`);
+  lines.push('');
+  lines.push('BY DISTRICT'); lines.push(rule);
+  DISTRICT_ORDER.forEach(d=>{
+    const r = rows.filter(p=>p.district===d);
+    lines.push(`${d.padEnd(16)} ${fmt(r.length).padStart(6)} vehicles  |  ${fmt(r.filter(p=>p.status==='moving').length).padStart(5)} moving  |  ${fmt(r.reduce((s,p)=>s+(p.distance_km||0),0),0).padStart(7)} km`);
+  });
+  lines.push('');
+  lines.push('FLEET HEALTH'); lines.push(rule);
+  lines.push(`Composite score: ${score} / 100`);
+  lines.push(`${movingPct}% moving, ${onlinePct}% online, ${battOk}% battery OK`);
+  lines.push('');
+  lines.push('PREDICTIONS & ALERTS'); lines.push(rule);
+  lines.push(`- ${fmt(activeSoon)} vehicles likely active in the next 4h`);
+  lines.push(`- ${fmt(riskOffline)} vehicles on the offline watchlist`);
+  lines.push(`- ${fmt(batteryRisk)} vehicles with battery under 2V`);
+  lines.push(`- ${fmt(outside)} vehicles outside Lahore UC polygons`);
+  lines.push('');
+  lines.push(`VEHICLE LIST (raw data, first 200 of ${fmt(rows.length)} shown)`); lines.push(rule);
+  rows.slice(0,200).forEach(p=>{
+    lines.push(`${(p.vehicle||'').padEnd(16)} ${(p.district||'').padEnd(14)} ${(p.status||'').padEnd(8)} dist=${fmt(p.distance_km,2)}km  batt=${p.battery_volt!=null?fmt(p.battery_volt,1)+'V':'-'}  last=${p.last_received||'-'}`);
+  });
+  if(rows.length>200) lines.push(`... and ${fmt(rows.length-200)} more vehicles not shown here (see the table for the full list).`);
+  return lines.join('\n');
+}
+let lastReportText = '';
+function generateReport(){
+  const rows = filtered();
+  lastReportText = buildReportText(rows);
+  document.getElementById('reportBox').textContent = lastReportText;
+  document.getElementById('reportMeta').textContent = `${fmt(rows.length)} vehicles · generated ${referenceTime.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}`;
+}
+function downloadReport(){
+  if(!lastReportText) generateReport();
+  const blob = new Blob([lastReportText], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const stamp = (state.date || DATA.snapshot) + '_' + String(referenceTime.getHours()).padStart(2,'0') + String(referenceTime.getMinutes()).padStart(2,'0');
+  const a = document.createElement('a');
+  a.href = url; a.download = `LWMC_Fleet_Report_${stamp}.txt`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+document.getElementById('genReport').onclick = generateReport;
+document.getElementById('dlReport').onclick = downloadReport;
+
+// ---- render ----
+function render(fit=false){
+  const rows=filtered();
+  drawKpis(rows); drawRail(rows); buildHead(); drawDateBlock(rows);
+  drawOverview(rows); drawCharts(rows); drawHealth(rows); drawPredictions(rows); drawSelected(rows);
+  drawMarkers(rows); drawTable(rows);
+  document.getElementById('tcount').textContent = fmt(rows.length)+' shown';
+  const timeBit = (state.timeFrom || state.timeTo) ? ` · ${state.timeFrom||'00:00'}-${state.timeTo||'23:59'}` : '';
+  document.getElementById('filterSummary').textContent =
+    `Showing ${fmt(rows.length)} vehicles · ${fmt(rows.filter(p=>isOnline(p)).length)} online · ` +
+    `${state.recent==='all'?'all recency':`last ${state.recent}h`} · ${state.uc || 'all UCs'} · ${state.date || 'all dates'}${timeBit}`;
+  if(fit && rows.length){
+    const b=L.latLngBounds(rows.filter(p=>p.lat!=null).map(p=>[p.lat,p.lon]));
+    if(b.isValid()) map.fitBounds(b.pad(.1));
+  }
+}
+
+// ---- controls ----
+document.querySelectorAll('#statusChips .chip').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('#statusChips .chip').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on'); state.status=c.dataset.s; render();
+});
+document.querySelectorAll('#recentChips .chip').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('#recentChips .chip').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on'); state.recent=c.dataset.r; render();
+});
+document.querySelectorAll('#connChips .chip').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('#connChips .chip').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on'); state.conn=c.dataset.c; render();
+});
+const types=[...new Set(POINTS.map(p=>p.vehicle_type).filter(Boolean))].sort();
+document.getElementById('typeSel').innerHTML='<option value="">All vehicle types</option>'+
+  types.map(t=>`<option value="${t}">${t}</option>`).join('');
+document.getElementById('ucSel').onchange=e=>{state.uc=e.target.value; render();};
+document.getElementById('typeSel').onchange=e=>{state.type=e.target.value; render();};
+document.getElementById('dateSel').onchange=e=>{state.date=e.target.value; render();};
+document.getElementById('timeFrom').onchange=e=>{state.timeFrom=e.target.value; render();};
+document.getElementById('timeTo').onchange=e=>{state.timeTo=e.target.value; render();};
+document.getElementById('search').oninput=e=>{state.q=e.target.value.toLowerCase().trim(); render();};
+document.getElementById('reset').onclick=()=>{
+  state={district:null,status:'all',recent:'all',conn:'all',uc:'',type:'',q:'',
+    date:'',timeFrom:'',timeTo:'',sort:'distance_km',dir:-1};
+  document.getElementById('typeSel').value=''; document.getElementById('search').value='';
+  document.getElementById('ucSel').value=''; document.getElementById('dateSel').value='';
+  document.getElementById('timeFrom').value=''; document.getElementById('timeTo').value='';
+  document.querySelectorAll('#statusChips .chip').forEach(x=>x.classList.toggle('on',x.dataset.s==='all'));
+  document.querySelectorAll('#recentChips .chip').forEach(x=>x.classList.toggle('on',x.dataset.r==='all'));
+  document.querySelectorAll('#connChips .chip').forEach(x=>x.classList.toggle('on',x.dataset.c==='all'));
+  render(true);
+};
+
+render();
+</script>
+</body>
+</html>
