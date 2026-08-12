@@ -164,9 +164,17 @@
   .chip[data-s="moving"].on{background:var(--moving)}
   .chip[data-s="still"].on{background:var(--still)}
   .chip[data-s="all"].on{background:var(--accent)}
+  .mode-toggle{width:auto;flex:0 0 auto}
+  .mode-toggle .chip{flex:0 0 auto;padding:7px 14px}
+  .mode-toggle .chip[data-mode="roster"].on{background:linear-gradient(155deg,var(--accent),var(--accent2))}
+  .mode-toggle .chip[data-mode="full"].on{background:var(--mut)}
   .reset{background:rgba(255,255,255,.4);border:1px solid var(--line);color:var(--mut);border-radius:9px;
          padding:7px;font-size:12px;cursor:pointer}
   .reset:hover{color:var(--ink);border-color:var(--accent)}
+  .accent-btn{background:linear-gradient(155deg,var(--accent),var(--accent2));color:#eefdf8;
+        border-color:transparent;font-weight:700}
+  .accent-btn:hover{color:#eefdf8;filter:brightness(1.06)}
+  .accent-btn:disabled{opacity:.6;cursor:default;filter:none}
   .filter-summary{font-size:11px;color:var(--mut);line-height:1.5;padding:8px 10px;
                   border:1px solid var(--line);border-radius:9px;background:rgba(255,255,255,.4)}
   .pill{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;
@@ -217,6 +225,10 @@
       <div class="txt"><b>LWMC Fleet Console</b><span>Lahore Division · live vehicle tracking</span></div>
     </div>
     <div class="snap" id="snap"><span class="dot-live"></span>—</div>
+    <div class="chips mode-toggle" id="modeToggle">
+      <div class="chip on" data-mode="full">Full fleet</div>
+      <div class="chip" data-mode="roster">Roster-scoped</div>
+    </div>
     <div class="legend">
       <span><i style="background:var(--moving)"></i>Moving</span>
       <span><i style="background:var(--still)"></i>Still / parked</span>
@@ -230,6 +242,11 @@
 
       <div class="sect">Date</div>
       <div class="date-block" id="dateBlock"></div>
+
+      <div class="sect" id="empSect" style="display:none">Employee (roster-scoped)</div>
+      <div class="filter-group" id="empGroup" style="display:none">
+        <select id="empSel"><option value="">All roster staff</option></select>
+      </div>
 
       <div class="sect">Districts</div>
       <div class="rail" id="rail"></div>
@@ -290,7 +307,7 @@
       </div>
 
       <div class="sect">Coverage note</div>
-      <div class="note">UC boundaries exist for Lahore city only. Kasur, Sheikhupura &amp; Nankana Sahib
+      <div class="note" id="coverageNote">UC boundaries exist for Lahore city only. Kasur, Sheikhupura &amp; Nankana Sahib
         vehicles are shown in written form here; use the UC filter to separate city-bound fleet from outside points.</div>
     </aside>
 
@@ -361,6 +378,9 @@
           <button class="reset" id="dlReport" style="flex:1">Download .txt</button>
         </div>
         <pre class="report-box" id="reportBox">Click "Generate report" to compile a written report from the vehicles currently in view (respects all filters above).</pre>
+        <div class="note" style="margin-top:10px">Excel workbook: Summary · By District · By Office · By Vehicle Type · By UC · By Employee · Watchlist · Vehicle Detail — all built from the vehicles currently in view.</div>
+        <button class="reset accent-btn" id="xlsxReport" style="width:100%;margin-top:8px">Export analytical report (.xlsx)</button>
+        <div class="note" id="xlsxStatus" style="margin-top:6px"></div>
       </section>
 
       <section class="panel" style="flex:1;min-height:260px;display:flex;flex-direction:column">
@@ -421,7 +441,8 @@ function rawRecordDetailHtml(p){
   return rawRecordPairs(p).map(([k,v])=>`<div class="detail-line"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
 }
 let state = {district:null, status:'all', recent:'all', conn:'all', uc:'', type:'', q:'',
-  date:'', timeFrom:'', timeTo:'', sort:'distance_km', dir:-1, selected:null};
+  date:'', timeFrom:'', timeTo:'', sort:'distance_km', dir:-1, selected:null,
+  rosterScoped:false, employee:''};
 function parseLastReceived(value){
   if(!value || value==='-') return null;
   const m = String(value).trim().match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{1,2}):(\d{2}) (AM|PM)$/);
@@ -438,6 +459,11 @@ const referenceTime = POINTS.reduce((acc, p) => p.last_received_ts && (!acc || p
 const ucOptions = [...new Map(POINTS.filter(p => p.uc).map(p => [p.uc, p])).values()]
   .sort((a,b) => a.uc.localeCompare(b.uc, undefined, {numeric:true}))
   .map(p => ({value: p.uc, label: `${p.uc} · ${p.uc_town || p.district}`}));
+const EMPLOYEES = (DATA.employees || []).map(e => ({...e, uc_set: new Set(e.resolved_ucs)}));
+const EMPLOYEE_BY_ID = new Map(EMPLOYEES.map(e => [e.id, e]));
+const ROSTER_UC_SET = new Set(DATA.roster_ucs || []);
+const ROLE_LABEL = {TM:'Tehsil Manager', FM:'Field Manager', AM_YARD:'AM Yard', NIGHT_SHIFT:'Night Shift'};
+const ROLE_ORDER = ['TM','FM','AM_YARD','NIGHT_SHIFT'];
 function ageHours(p){
   if(!p.last_received_ts) return Infinity;
   return (referenceTime - p.last_received_ts) / 36e5;
@@ -462,6 +488,14 @@ const dateOptions = [...new Set(POINTS.map(p=>p.snapshot).filter(Boolean))].sort
 document.getElementById('dateSel').innerHTML = '<option value="">All dates</option>' +
   dateOptions.map(d => `<option value="${d}">${d}</option>`).join('');
 if(dateOptions.length === 1){ state.date = dateOptions[0]; document.getElementById('dateSel').value = dateOptions[0]; }
+document.getElementById('empSel').innerHTML = '<option value="">All roster staff</option>' +
+  ROLE_ORDER.filter(r => EMPLOYEES.some(e => e.role === r)).map(role => {
+    const opts = EMPLOYEES.filter(e => e.role === role).map(e => {
+      const covLabel = e.resolved_ucs.length ? `${e.resolved_ucs.length} UC${e.resolved_ucs.length===1?'':'s'}` : 'unresolved area';
+      return `<option value="${e.id}">${e.name} · ${covLabel}</option>`;
+    }).join('');
+    return `<optgroup label="${ROLE_LABEL[role]}">${opts}</optgroup>`;
+  }).join('');
 
 // ---- map ----
 const map = L.map('map',{preferCanvas:true, zoomControl:true}).setView([31.52,74.06],9);
@@ -534,6 +568,14 @@ function filtered(){
     if(state.uc){
       if(state.uc === 'outside'){ if(p.uc) return false; }
       else if(p.uc !== state.uc) return false;
+    }
+    if(state.rosterScoped){
+      if(p.district !== 'Lahore') return false;
+      if(!p.uc || !ROSTER_UC_SET.has(p.uc)) return false;
+    }
+    if(state.employee){
+      const emp = EMPLOYEE_BY_ID.get(state.employee);
+      if(!emp || !p.uc || !emp.uc_set.has(p.uc)) return false;
     }
     if(state.type && p.vehicle_type!==state.type) return false;
     if(state.q && !(p.vehicle||'').toLowerCase().includes(state.q)) return false;
@@ -804,6 +846,8 @@ function buildReportText(rows){
   lines.push(`UC             : ${state.uc || 'All'}`);
   lines.push(`Vehicle type   : ${state.type || 'All'}`);
   lines.push(`Search         : ${state.q || '(none)'}`);
+  lines.push(`Roster mode    : ${state.rosterScoped ? 'Roster-scoped (Lahore, roster UCs only)' : 'Full fleet'}`);
+  lines.push(`Employee       : ${state.employee ? ((EMPLOYEE_BY_ID.get(state.employee)||{}).name || state.employee) : 'All'}`);
   lines.push('');
   lines.push('SUMMARY'); lines.push(rule);
   lines.push(`Moving / Still  : ${fmt(moving)} / ${fmt(still)}`);
@@ -815,6 +859,16 @@ function buildReportText(rows){
     const r = rows.filter(p=>p.district===d);
     lines.push(`${d.padEnd(16)} ${fmt(r.length).padStart(6)} vehicles  |  ${fmt(r.filter(p=>p.status==='moving').length).padStart(5)} moving  |  ${fmt(r.reduce((s,p)=>s+(p.distance_km||0),0),0).padStart(7)} km`);
   });
+  lines.push('');
+  lines.push('BY EMPLOYEE (roster)'); lines.push(rule);
+  if(EMPLOYEES.length){
+    buildEmployeeSheet(rows).slice(1).forEach(r=>{
+      lines.push(`${String(r[0]).padEnd(22)} ${String(r[1]).padEnd(16)} ${String(r[2]).padStart(14)}  |  ${fmt(r[3]).padStart(6)} vehicles  |  ${fmt(r[4]).padStart(5)} moving  |  ${fmt(r[8],0).padStart(7)} km`);
+    });
+    lines.push(`Roster coverage: ${fmt(ROSTER_UC_SET.size)}/${fmt(ALL_LAHORE_UCS.size)} Lahore UCs (${rosterCoveragePct}%) covered by ${fmt(EMPLOYEES.length)} staff.`);
+  } else {
+    lines.push('No roster data available.');
+  }
   lines.push('');
   lines.push('FLEET HEALTH'); lines.push(rule);
   lines.push(`Composite score: ${score} / 100`);
@@ -853,17 +907,292 @@ function downloadReport(){
 document.getElementById('genReport').onclick = generateReport;
 document.getElementById('dlReport').onclick = downloadReport;
 
+// ---- xlsx export (zero-dependency OOXML + stored-mode ZIP writer, fully offline) ----
+function makeCrcTable(){
+  const table = [];
+  for(let n=0;n<256;n++){
+    let c = n;
+    for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    table[n] = c >>> 0;
+  }
+  return table;
+}
+const CRC_TABLE = makeCrcTable();
+function crc32(bytes){
+  let c = 0xFFFFFFFF;
+  for(let i=0;i<bytes.length;i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+class ByteWriter{
+  constructor(){ this.chunks = []; this.length = 0; }
+  bytes(u8){ this.chunks.push(u8); this.length += u8.length; }
+  u16(v){ const b=new Uint8Array(2); new DataView(b.buffer).setUint16(0,v,true); this.bytes(b); }
+  u32(v){ const b=new Uint8Array(4); new DataView(b.buffer).setUint32(0,v>>>0,true); this.bytes(b); }
+  toUint8Array(){
+    const out = new Uint8Array(this.length);
+    let o=0; for(const c of this.chunks){ out.set(c,o); o+=c.length; }
+    return out;
+  }
+}
+const ZIP_ENC = new TextEncoder();
+function makeZip(files){
+  const local = new ByteWriter(), central = new ByteWriter(), offsets = [];
+  for(const f of files){
+    const nameBytes = ZIP_ENC.encode(f.name);
+    const crc = crc32(f.data);
+    offsets.push(local.length);
+    local.u32(0x04034b50); local.u16(20); local.u16(0); local.u16(0); local.u16(0); local.u16(0);
+    local.u32(crc); local.u32(f.data.length); local.u32(f.data.length);
+    local.u16(nameBytes.length); local.u16(0);
+    local.bytes(nameBytes); local.bytes(f.data);
+  }
+  const cdStart = local.length;
+  files.forEach((f,i)=>{
+    const nameBytes = ZIP_ENC.encode(f.name);
+    const crc = crc32(f.data);
+    central.u32(0x02014b50); central.u16(20); central.u16(20); central.u16(0); central.u16(0); central.u16(0); central.u16(0);
+    central.u32(crc); central.u32(f.data.length); central.u32(f.data.length);
+    central.u16(nameBytes.length); central.u16(0); central.u16(0); central.u16(0); central.u16(0); central.u32(0);
+    central.u32(offsets[i]); central.bytes(nameBytes);
+  });
+  const cdSize = central.length;
+  const end = new ByteWriter();
+  end.u32(0x06054b50); end.u16(0); end.u16(0); end.u16(files.length); end.u16(files.length);
+  end.u32(cdSize); end.u32(cdStart); end.u16(0);
+  const total = new ByteWriter();
+  total.bytes(local.toUint8Array()); total.bytes(central.toUint8Array()); total.bytes(end.toUint8Array());
+  return total.toUint8Array();
+}
+function xmlEscape(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
+}
+function colName(n){
+  let s=''; while(n>0){ const r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=Math.floor((n-1)/26); }
+  return s;
+}
+function sheetXml(rows){
+  const rowsXml = rows.map((row, ri) => {
+    const cells = row.map((val, ci) => {
+      const ref = colName(ci+1) + (ri+1);
+      const styleAttr = ri===0 ? ' s="1"' : '';
+      if(typeof val === 'number' && isFinite(val)) return `<c r="${ref}"${styleAttr}><v>${val}</v></c>`;
+      const text = val==null ? '' : String(val);
+      return `<c r="${ref}" t="inlineStr"${styleAttr}><is><t xml:space="preserve">${xmlEscape(text)}</t></is></c>`;
+    }).join('');
+    return `<row r="${ri+1}">${cells}</row>`;
+  }).join('');
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rowsXml}</sheetData></worksheet>`;
+}
+const XLSX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
+<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
+<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="2">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+function buildXlsx(sheets){
+  const files = [];
+  files.push({name:'[Content_Types].xml', data: ZIP_ENC.encode(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+    `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
+    `<Default Extension="xml" ContentType="application/xml"/>` +
+    `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
+    `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
+    sheets.map((s,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') +
+    `</Types>`)});
+  files.push({name:'_rels/.rels', data: ZIP_ENC.encode(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>` +
+    `</Relationships>`)});
+  files.push({name:'xl/workbook.xml', data: ZIP_ENC.encode(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+    `<sheets>` + sheets.map((s,i)=>`<sheet name="${xmlEscape(s.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('') + `</sheets>` +
+    `</workbook>`)});
+  files.push({name:'xl/_rels/workbook.xml.rels', data: ZIP_ENC.encode(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+    sheets.map((s,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('') +
+    `<Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
+    `</Relationships>`)});
+  files.push({name:'xl/styles.xml', data: ZIP_ENC.encode(XLSX_STYLES)});
+  sheets.forEach((s,i)=>{ files.push({name:`xl/worksheets/sheet${i+1}.xml`, data: ZIP_ENC.encode(sheetXml(s.rows))}); });
+  return makeZip(files);
+}
+
+// ---- analytical report sheets ----
+function groupRows(rows, keyFn){
+  const map = new Map();
+  rows.forEach(p=>{
+    const k = keyFn(p) ?? '(unspecified)';
+    if(!map.has(k)) map.set(k, []);
+    map.get(k).push(p);
+  });
+  return map;
+}
+function groupStatsRows(rows, keyFn, keyLabel){
+  const groups = groupRows(rows, keyFn);
+  const out = [[keyLabel,'Vehicles','Moving','Still','Online','Offline','Total distance (km)','Avg distance (km)']];
+  [...groups.entries()].sort((a,b)=> b[1].length - a[1].length).forEach(([k, g])=>{
+    const moving = g.filter(p=>p.status==='moving').length;
+    const still = g.filter(p=>p.status==='still').length;
+    const online = g.filter(p=>isOnline(p)).length;
+    const dist = g.reduce((s,p)=>s+(p.distance_km||0),0);
+    out.push([k, g.length, moving, still, online, g.length-online, Math.round(dist*100)/100, Math.round((dist/g.length)*100)/100]);
+  });
+  return out;
+}
+function buildSummarySheet(rows){
+  const total = rows.length || 1;
+  const moving = rows.filter(p=>p.status==='moving').length;
+  const still = rows.filter(p=>p.status==='still').length;
+  const online = rows.filter(p=>isOnline(p)).length;
+  const dist = rows.reduce((s,p)=>s+(p.distance_km||0),0);
+  const battOk = 1 - (rows.filter(p=>p.battery_volt!=null && p.battery_volt<2).length/total);
+  const score = Math.round((moving/total)*40 + (online/total)*40 + battOk*20);
+  return [
+    ['LWMC Fleet Console — Analytical Report', ''],
+    ['Report period', (state.date || DATA.snapshot) + ((state.timeFrom||state.timeTo) ? ' · '+(state.timeFrom||'00:00')+'-'+(state.timeTo||'23:59') : '')],
+    ['Generated', referenceTime.toLocaleString()],
+    ['', ''],
+    ['Filters applied', ''],
+    ['District', state.district || 'All'],
+    ['Status', state.status],
+    ['Recent activity', state.recent==='all' ? 'All' : 'last '+state.recent+'h'],
+    ['Connectivity', state.conn],
+    ['UC', state.uc || 'All'],
+    ['Vehicle type', state.type || 'All'],
+    ['Search', state.q || '(none)'],
+    ['', ''],
+    ['Summary', ''],
+    ['Vehicles in view', rows.length],
+    ['Moving', moving],
+    ['Still', still],
+    ['Online', online],
+    ['Offline', rows.length-online],
+    ['Total distance (km)', Math.round(dist*100)/100],
+    ['Fleet health score (/100)', score],
+  ];
+}
+function buildWatchlistSheet(rows){
+  const out = [['Vehicle','District','Office','Issue','Battery (V)','Reporting status','Last received','Age']];
+  rows.forEach(p=>{
+    const issues = [];
+    if(!isOnline(p)) issues.push('Offline');
+    if(p.reporting_status === 'Not Reporting') issues.push('Not reporting');
+    if(ageHours(p) > 8) issues.push('Stale >8h');
+    if(p.battery_volt != null && p.battery_volt < 2) issues.push('Battery <2V');
+    if(p.tracker_offline) issues.push('Tracker offline flag');
+    if(issues.length){
+      out.push([p.vehicle, p.district, p.office||'', issues.join('; '), p.battery_volt!=null?p.battery_volt:'', p.reporting_status||'', p.last_received||'', ageLabel(p)]);
+    }
+  });
+  return out;
+}
+function buildDetailSheet(rows){
+  const cols = Object.keys(RAW_FIELD_LABELS);
+  const out = [cols.map(k=>RAW_FIELD_LABELS[k])];
+  rows.forEach(p=>{
+    out.push(cols.map(k=>{
+      const v = p[k];
+      if(v==null) return '';
+      if(typeof v === 'boolean') return v ? 'Yes' : 'No';
+      return v;
+    }));
+  });
+  return out;
+}
+function buildUcSheet(rows){
+  const groups = groupRows(rows.filter(p=>p.uc), p=>p.uc);
+  const out = [['UC','Town','Vehicles','Moving','Total distance (km)']];
+  [...groups.entries()].sort((a,b)=> b[1].length - a[1].length).forEach(([uc, g])=>{
+    out.push([uc, g[0].uc_town||'', g.length, g.filter(p=>p.status==='moving').length, Math.round(g.reduce((s,p)=>s+(p.distance_km||0),0)*100)/100]);
+  });
+  return out;
+}
+function buildEmployeeSheet(rows){
+  // per-employee filter-and-aggregate, not a single-key grouping: a UC can
+  // belong to more than one employee's coverage set (TM/FM/AM Yard overlap
+  // by design), so this is not a disjoint partition of `rows`.
+  const out = [['Employee','Role','Coverage (UCs)','Vehicles','Moving','Still','Online','Offline','Total distance (km)','Avg distance (km)']];
+  EMPLOYEES.forEach(e=>{
+    if(!e.uc_set.size){
+      out.push([e.name, ROLE_LABEL[e.role]||e.role, '0 UCs — unresolved', 0,0,0,0,0,0,0]);
+      return;
+    }
+    const g = rows.filter(p=>p.uc && e.uc_set.has(p.uc));
+    const moving = g.filter(p=>p.status==='moving').length;
+    const still = g.filter(p=>p.status==='still').length;
+    const online = g.filter(p=>isOnline(p)).length;
+    const dist = g.reduce((s,p)=>s+(p.distance_km||0),0);
+    out.push([e.name, ROLE_LABEL[e.role]||e.role, e.uc_set.size, g.length, moving, still, online, g.length-online,
+      Math.round(dist*100)/100, g.length ? Math.round((dist/g.length)*100)/100 : 0]);
+  });
+  return out;
+}
+function exportExcelReport(){
+  const btn = document.getElementById('xlsxReport');
+  const status = document.getElementById('xlsxStatus');
+  btn.disabled = true; status.textContent = 'Building workbook…';
+  try{
+    const rows = filtered();
+    const sheets = [
+      {name:'Summary', rows: buildSummarySheet(rows)},
+      {name:'By District', rows: groupStatsRows(rows, p=>p.district, 'District')},
+      {name:'By Office', rows: groupStatsRows(rows, p=>p.office, 'Office')},
+      {name:'By Vehicle Type', rows: groupStatsRows(rows, p=>p.vehicle_type, 'Vehicle type')},
+      {name:'By UC', rows: buildUcSheet(rows)},
+      {name:'By Employee', rows: buildEmployeeSheet(rows)},
+      {name:'Watchlist', rows: buildWatchlistSheet(rows)},
+      {name:'Vehicle Detail', rows: buildDetailSheet(rows)},
+    ];
+    const bytes = buildXlsx(sheets);
+    const blob = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url = URL.createObjectURL(blob);
+    const stamp = (state.date || DATA.snapshot) + '_' + String(referenceTime.getHours()).padStart(2,'0') + String(referenceTime.getMinutes()).padStart(2,'0');
+    const a = document.createElement('a');
+    a.href = url; a.download = `LWMC_Fleet_Report_${stamp}.xlsx`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    status.textContent = `Exported ${fmt(rows.length)} vehicles across ${sheets.length} sheets.`;
+  } catch(e){
+    status.textContent = 'Export failed: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById('xlsxReport').onclick = exportExcelReport;
+
+// ---- roster mode UI ----
+const ALL_LAHORE_UCS = new Set((DATA.ucs.features||[]).map(f=>f.properties.uc));
+const rosterCoveragePct = ALL_LAHORE_UCS.size ? (100*ROSTER_UC_SET.size/ALL_LAHORE_UCS.size).toFixed(1) : '0.0';
+const ROSTER_COVERAGE_NOTE = `Roster coverage: ${fmt(ROSTER_UC_SET.size)}/${fmt(ALL_LAHORE_UCS.size)} Lahore UCs (${rosterCoveragePct}%) covered by ${fmt(EMPLOYEES.length)} staff on the roster.`;
+const FULL_COVERAGE_NOTE = document.getElementById('coverageNote').textContent;
+function updateRosterUI(){
+  document.getElementById('empSect').style.display = state.rosterScoped ? '' : 'none';
+  document.getElementById('empGroup').style.display = state.rosterScoped ? '' : 'none';
+  document.getElementById('coverageNote').textContent = state.rosterScoped
+    ? FULL_COVERAGE_NOTE + ' ' + ROSTER_COVERAGE_NOTE
+    : FULL_COVERAGE_NOTE;
+}
+
 // ---- render ----
 function render(fit=false){
   const rows=filtered();
+  updateRosterUI();
   drawKpis(rows); drawRail(rows); buildHead(); drawDateBlock(rows);
   drawOverview(rows); drawCharts(rows); drawHealth(rows); drawPredictions(rows); drawSelected(rows);
   drawMarkers(rows); drawTable(rows);
   document.getElementById('tcount').textContent = fmt(rows.length)+' shown';
   const timeBit = (state.timeFrom || state.timeTo) ? ` · ${state.timeFrom||'00:00'}-${state.timeTo||'23:59'}` : '';
+  const empBit = state.employee ? ` · ${(EMPLOYEE_BY_ID.get(state.employee)||{}).name || ''}` : '';
   document.getElementById('filterSummary').textContent =
     `Showing ${fmt(rows.length)} vehicles · ${fmt(rows.filter(p=>isOnline(p)).length)} online · ` +
-    `${state.recent==='all'?'all recency':`last ${state.recent}h`} · ${state.uc || 'all UCs'} · ${state.date || 'all dates'}${timeBit}`;
+    `${state.recent==='all'?'all recency':`last ${state.recent}h`} · ${state.uc || 'all UCs'} · ${state.date || 'all dates'}${timeBit}` +
+    `${state.rosterScoped ? ' · roster-scoped' : ''}${empBit}`;
   if(fit && rows.length){
     const b=L.latLngBounds(rows.filter(p=>p.lat!=null).map(p=>[p.lat,p.lon]));
     if(b.isValid()) map.fitBounds(b.pad(.1));
@@ -892,9 +1221,20 @@ document.getElementById('dateSel').onchange=e=>{state.date=e.target.value; rende
 document.getElementById('timeFrom').onchange=e=>{state.timeFrom=e.target.value; render();};
 document.getElementById('timeTo').onchange=e=>{state.timeTo=e.target.value; render();};
 document.getElementById('search').oninput=e=>{state.q=e.target.value.toLowerCase().trim(); render();};
+document.getElementById('modeToggle').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+  document.getElementById('modeToggle').querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on'); state.rosterScoped = c.dataset.mode==='roster';
+  if(!state.rosterScoped){ state.employee=''; document.getElementById('empSel').value=''; }
+  render(true);
+});
+document.getElementById('empSel').onchange=e=>{state.employee=e.target.value; render();};
 document.getElementById('reset').onclick=()=>{
+  // "Reset filters" clears filter chips only -- roster-scoped mode is a
+  // mode switch, not a same-tier filter, so it's left alone here and has
+  // its own explicit toggle-off in the top bar.
   state={district:null,status:'all',recent:'all',conn:'all',uc:'',type:'',q:'',
-    date:'',timeFrom:'',timeTo:'',sort:'distance_km',dir:-1};
+    date:'',timeFrom:'',timeTo:'',sort:'distance_km',dir:-1,
+    rosterScoped:state.rosterScoped, employee:state.employee};
   document.getElementById('typeSel').value=''; document.getElementById('search').value='';
   document.getElementById('ucSel').value=''; document.getElementById('dateSel').value='';
   document.getElementById('timeFrom').value=''; document.getElementById('timeTo').value='';
