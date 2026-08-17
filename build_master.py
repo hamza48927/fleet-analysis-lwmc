@@ -2,7 +2,9 @@
 """
 Build the LWMC fleet master dataset for the local dashboard.
 
-Scope: Lahore + Sheikhupura + Kasur + Nankana Sahib  (= the whole LWMC company in VTMS)
+Scope: Lahore city only (Sheikhupura/Kasur/Nankana Sahib rows are dropped --
+       UC/zone geometry, the employee roster, and fleet targets are all
+       Lahore-specific, so those districts have nothing to attach to here)
 Sources used: VTMS active logs + LWMC vehicle-status .xls  (VTCS is intentionally NOT used)
 Geography: Lahore UC boundaries (KML -> GeoJSON), assigned to vehicles by point-in-polygon.
 
@@ -19,7 +21,8 @@ from pathlib import Path
 VTMS_CSV = "export-vtms-active-logs-11-08-2026-11_31_03.csv"
 LWMC_XLS = "vs.xlsx"                       # converted from the .xls export
 UC_GEOJSON = "lahore_ucs.geojson"
-EMPLOYEE_XLSX = "employee data.xlsx"       # TM/FM/AM-Yard/Night-Shift roster (performance scoping)
+EMPLOYEE_XLSX = "employee sheet caping.xlsx"  # TM/FM/ZO/AM-Yard/MVI roster (performance scoping)
+TOWN_TARGETS_JSON = "Reference Documents/town_targets.json"  # from extract_town_targets.py
 SNAPSHOT_DATE = "2026-08-11"
 
 TEHSIL_TO_DISTRICT = {
@@ -29,6 +32,16 @@ TEHSIL_TO_DISTRICT = {
     'Kasu':'Kasur','Patt':'Kasur','Chun':'Kasur','KoRK':'Kasur',
     'NaSa':'Nankana Sahib','SaHi':'Nankana Sahib','ShKo':'Nankana Sahib',
     'OtSi':'Other',
+}
+
+# the same 9 Lahore tehsil codes, mapped to the town a vehicle is REGISTERED
+# under (its home office) -- used to detect whether a vehicle's current
+# GPS-derived uc_town matches where it's actually assigned, i.e. is it
+# working inside its own area or has it strayed into someone else's.
+TEHSIL_TO_TOWN = {
+    'AlIT':'Allama Iqbal Town', 'ShTo':'Shalimar Town', 'RaTo':'Ravi Town',
+    'NiTo':'Nishter Town', 'WaTo':'Wagha Town', 'DaGB':'DGBT',
+    'SaTo':'Samnabad Town', 'AzBT':'Aziz Bhatti Town', 'GuTo':'Gulberg Town',
 }
 
 def num(s):
@@ -81,23 +94,21 @@ TOWN_ABBR = {
     'WT': 'Wagha Town', 'ABT': 'Aziz Bhatti Town', 'DGBT': 'DGBT',
 }
 
-ZONE_START_RE = re.compile(r'zone[\s-]*', re.IGNORECASE)
-NUM_TOKEN_RE = re.compile(r'(\d+)\s*-?\s*([ab])?', re.IGNORECASE)
-
-def extract_zone_numbers(text):
-    """Find every 'Zone <n[,n...]>' cluster in text (comma/&/and separated,
-    tolerant of lettered sub-zones like '12-A'). Only digits that directly
-    follow the literal word 'Zone' count -- bare digits elsewhere in the
-    string (e.g. 'Canal Road Cricle 1') must never be picked up."""
-    zones, letter_flagged = [], False
-    for m in ZONE_START_RE.finditer(text):
-        run_match = re.match(r'[\dABand,&\s-]*', text[m.end():], re.IGNORECASE)
-        run = run_match.group(0) if run_match else ''
-        for nm in NUM_TOKEN_RE.finditer(run):
-            zones.append(nm.group(1))
-            if nm.group(2):
-                letter_flagged = True
-    return zones, letter_flagged
+# Full town-name spelling -> geojson's canonical spelling. "employee sheet
+# caping.xlsx" writes towns out in full (not abbreviated like the old
+# roster file) but doesn't always match lahore_ucs.geojson's own spelling
+# ("Nishtar"/"Nishter", "Data Gunj Bakhsh Town"/"DGBT", "Samanabad"/
+# "Samnabad") -- same normalization problem extract_town_targets.py already
+# solved for the fleet registry, applied here to the roster.
+TOWN_FULL_NORM = {
+    'allama iqbal town': 'Allama Iqbal Town', 'gulberg town': 'Gulberg Town',
+    'nishtar town': 'Nishter Town', 'nishter town': 'Nishter Town',
+    'ravi town': 'Ravi Town', 'samanabad town': 'Samnabad Town',
+    'samnabad town': 'Samnabad Town', 'wagha town': 'Wagha Town',
+    'aziz bhatti town': 'Aziz Bhatti Town',
+    'data gunj bakhsh town': 'DGBT', 'dgbt': 'DGBT',
+    'shalimar town': 'Shalimar Town',
+}
 
 def _split_list(s):
     return [t.strip() for t in re.split(r'[,&]| and ', s, flags=re.IGNORECASE) if t.strip()]
@@ -117,46 +128,27 @@ def _town_wildcard(text):
             return [TOWN_ABBR[t.upper()] for t in toks2]
     return None
 
-def resolve_area(raw_text, zone_to_ucs, town_to_ucs):
-    """Resolve one Zone/Yard cell to a set of UC codes.
-    Returns (method, resolved_zones, resolved_ucs, warnings)."""
-    text = '' if raw_text is None else str(raw_text).strip()
-    if not text or text == '-':
-        return 'unresolved', [], [], [f"empty/placeholder area text: {raw_text!r}"]
-
-    # 1. explicit UC list: a parenthesized number list (with or without a
-    #    'UC' prefix) that isn't itself another zone/town reference
-    for grp in re.findall(r'\(([^)]*)\)', text):
-        nums = re.findall(r'(?:UC[\s-]?)?(\d{2,4})', grp)
-        stripped = re.sub(r'UC', '', grp, flags=re.IGNORECASE)
-        if nums and not re.search(r'[A-Za-z]{2,}', stripped):
-            zones, _ = extract_zone_numbers(text)
-            ucs_list = sorted({f"UC-{n}" for n in nums})
-            return 'explicit_uc', sorted({f"Zone-{z}" for z in zones}), ucs_list, []
-
-    # 2. zone list (comma/&/and separated, lettered sub-zones approximated
-    #    to their base numeric zone)
-    zones, letter_flagged = extract_zone_numbers(text)
-    if zones:
-        warnings = []
-        if letter_flagged:
-            warnings.append(f"lettered sub-zone approximated to parent zone: {raw_text!r}")
-        zone_labels = sorted({f"Zone-{z}" for z in zones})
-        ucs_list = sorted({uc for zl in zone_labels for uc in zone_to_ucs.get(zl, [])})
-        leftover = ZONE_START_RE.sub('', text)
-        leftover = re.sub(r'[\dABand,&\s()-]', '', leftover, flags=re.IGNORECASE)
-        if len(leftover) > 2:
-            warnings.append(f"ignored trailing text: {raw_text!r}")
-        return 'zone_list', zone_labels, ucs_list, warnings
-
-    # 3. town wildcard (whole-cell or AM-Yards trailing-paren form)
-    towns = _town_wildcard(text)
-    if towns:
-        ucs_list = sorted({uc for t in towns for uc in town_to_ucs.get(t, [])})
-        return 'town_wildcard', [], ucs_list, []
-
-    # 4. unresolved -- surfaced, not dropped
-    return 'unresolved', [], [], [f"unrecognized area text: {raw_text!r}"]
+def resolve_town_field(text, town_to_ucs):
+    """Resolve a roster 'Town' cell (full names, sometimes a comma/&-joined
+    list of abbreviations like 'WT, ABT& RR') to a set of UC codes. Unlike
+    _town_wildcard's all-or-nothing match, this resolves whatever tokens ARE
+    recognized and flags the rest -- 'WT, ABT& RR' should still resolve to
+    Wagha Town + Aziz Bhatti Town with 'RR' flagged, not be thrown away."""
+    if not text or not str(text).strip():
+        return [], []
+    toks = _split_list(str(text).strip())
+    matched, unmatched = [], []
+    for t in toks:
+        norm = TOWN_FULL_NORM.get(t.strip().lower()) or TOWN_ABBR.get(t.strip().upper())
+        if norm:
+            matched.append(norm)
+        else:
+            unmatched.append(t)
+    if not matched:
+        return [], []
+    ucs_list = sorted({uc for tn in matched for uc in town_to_ucs.get(tn, [])})
+    warnings = [f"partially matched town list, ignored: {', '.join(unmatched)}"] if unmatched else []
+    return ucs_list, warnings
 
 def _clean_id(v):
     if v is None or (isinstance(v, float) and pd.isna(v)):
@@ -165,6 +157,56 @@ def _clean_id(v):
         return str(int(v))
     s = str(v).strip()
     return s if s else None
+
+# Sheet name -> role code. "employee sheet caping.xlsx" replaced the old
+# TMs/FMs/AM Yards/Night Shift workbook: Zonal Officers and MVI are new
+# roles, and "Night Shift" is no longer a separate sheet -- it's now a
+# per-row Shift value (1st/2nd/Night) inside each of these 5 sheets, so a
+# person working two shifts appears as two rows (handled naturally since
+# each row gets its own id from its own Sr. No.).
+ROSTER_SHEETS = [
+    ('Town Managers', 'TM'), ('Fleet Managers', 'FM'),
+    ('Zonal Officers', 'ZO'), ('AM Yards', 'AM_YARD'), ('MVI', 'MVI'),
+]
+
+def _cell_str(v):
+    return None if v is None or (isinstance(v, float) and pd.isna(v)) else str(v).strip() or None
+
+def resolve_roster_row(role, town_raw, zone_nums_raw, uc_nums_raw, area_raw, workshop_raw, zone_to_ucs, town_to_ucs):
+    """Resolve one roster row to a set of UC codes. Unlike the old employee
+    data.xlsx (which needed regex extraction), this file already resolves
+    Zone Numbers / UC Numbers to clean comma-separated int lists -- so this
+    just picks the most specific column that's populated, in priority
+    order, instead of re-deriving them from free text."""
+    uc_s = _cell_str(uc_nums_raw)
+    if uc_s:
+        nums = [n.strip() for n in re.split(r'[,\s]+', uc_s) if n.strip()]
+        ucs_list = sorted({f"UC-{n}" for n in nums}, key=lambda s: int(s.split('-')[1]))
+        return 'explicit_uc', ucs_list, []
+    zn_s = _cell_str(zone_nums_raw)
+    if zn_s:
+        nums = [n.strip() for n in re.split(r'[,\s]+', zn_s) if n.strip()]
+        zone_labels = sorted({f"Zone-{n}" for n in nums}, key=lambda s: int(s.split('-')[1]))
+        ucs_list = sorted({uc for zl in zone_labels for uc in zone_to_ucs.get(zl, [])})
+        return 'zone_list', ucs_list, []
+    ucs_list, warns = resolve_town_field(_cell_str(town_raw), town_to_ucs)
+    if ucs_list:
+        return 'town_wildcard', ucs_list, warns
+    # Town column was blank/unresolvable -- some rows (mostly MVI/AM Yard
+    # workshop postings) carry the same information in Area/Workshop text
+    # instead, either as a bare abbreviation list ("SBT, NT, AIT, GT") or a
+    # trailing-paren town tag ("Childran Workshop (NT)").
+    for free_text in (_cell_str(workshop_raw), _cell_str(area_raw)):
+        if not free_text:
+            continue
+        ucs_list, warns = resolve_town_field(free_text, town_to_ucs)
+        if ucs_list:
+            return 'town_wildcard', ucs_list, warns
+        towns = _town_wildcard(free_text)
+        if towns:
+            ucs_list = sorted({uc for t in towns for uc in town_to_ucs.get(t, [])})
+            return 'town_wildcard', ucs_list, []
+    return 'unresolved', [], []
 
 def load_employee_roster(xlsx_path, ucs):
     zone_to_ucs, town_to_ucs = {}, {}
@@ -176,109 +218,57 @@ def load_employee_roster(xlsx_path, ucs):
     all_lahore_ucs = sorted({u['uc'] for u in ucs})
 
     employees = []
-    stats = {r: {'total': 0, 'excluded': 0, 'resolved': 0, 'unresolved': 0}
-             for r in ('TM', 'FM', 'AM_YARD', 'NIGHT_SHIFT')}
+    stats = {r: {'total': 0, 'resolved': 0, 'unresolved': 0} for _, r in ROSTER_SHEETS}
 
-    def add_employee(role, sheet_row, name, area_text, contact=None, cnic=None,
-                      designation=None, circle=None):
-        stats[role]['total'] += 1
-        method, zones, ucs_list, warns = resolve_area(area_text, zone_to_ucs, town_to_ucs)
-        stats[role]['unresolved' if method == 'unresolved' else 'resolved'] += 1
-        employees.append({
-            'id': f"{role}-{sheet_row}",
-            'name': str(name).strip(),
-            'role': role,
-            'designation': None if designation is None or pd.isna(designation) else str(designation).strip(),
-            'circle': None if circle is None or pd.isna(circle) else str(circle).strip(),
-            'contact': _clean_id(contact),
-            'cnic': _clean_id(cnic),
-            'raw_area_text': None if area_text is None or pd.isna(area_text) else str(area_text).strip(),
-            'resolution_method': method,
-            'resolved_zones': zones,
-            'resolved_ucs': ucs_list,
-            'warnings': warns,
-        })
-
-    tm = pd.read_excel(xlsx_path, sheet_name='TMs', header=3)
-    tm['Circle'] = tm['Circle'].ffill()
-    tm['Town'] = tm['Town'].ffill()
-    for i, row in tm.iterrows():
-        if pd.isna(row.get('TM')):
-            continue
-        sheet_row = int(row['Sr.No']) if pd.notna(row.get('Sr.No')) else i + 4
-        if pd.isna(row.get('Zone')):
-            stats['TM']['excluded'] += 1
-            continue
-        add_employee('TM', sheet_row, row['TM'], row['Zone'],
-                      contact=row.get('Contact No'), circle=row.get('Circle'))
-
-    fm = pd.read_excel(xlsx_path, sheet_name='FMs', header=2)
-    fm['Circle'] = fm['Circle'].ffill()
-    for i, row in fm.iterrows():
-        if pd.isna(row.get('Sr.No')):
-            continue
-        sheet_row = int(row['Sr.No'])
-        if pd.isna(row.get('Name of FM')):
-            stats['FM']['excluded'] += 1
-            continue
-        add_employee('FM', sheet_row, row['Name of FM'], row['Zone'],
-                      cnic=row.get('CNIC'), designation=row.get('Designation'), circle=row.get('Circle'))
-
-    am = pd.read_excel(xlsx_path, sheet_name='AM Yards', header=4)
-    am['Circle'] = am['Circle'].ffill()
-    for i, row in am.iterrows():
-        if pd.isna(row.get('Sr. No')):
-            continue
-        sheet_row = int(row['Sr. No'])
-        if pd.isna(row.get('Name of AM Yard')):
-            stats['AM_YARD']['excluded'] += 1
-            continue
-        add_employee('AM_YARD', sheet_row, row['Name of AM Yard'], row['Yard'],
-                      cnic=row.get('CNIC'), designation=row.get('Designation'), circle=row.get('Circle'))
-
-    # Night Shift: detected structurally (this sheet has no area column at
-    # all), so every row here means "responsible for all of Lahore" -- this
-    # generalizes to any future no-area-column sheet, not just this one name.
-    ns = pd.read_excel(xlsx_path, sheet_name='Night Shift', header=3)
-    for i, row in ns.iterrows():
-        if pd.isna(row.get('Name')):
-            continue
-        stats['NIGHT_SHIFT']['total'] += 1
-        stats['NIGHT_SHIFT']['resolved'] += 1
-        employees.append({
-            'id': f"NIGHT_SHIFT-{i + 1}",
-            'name': str(row['Name']).strip(),
-            'role': 'NIGHT_SHIFT',
-            'designation': None if pd.isna(row.get('Designation')) else str(row['Designation']).strip(),
-            'circle': None,
-            'contact': None,
-            'cnic': _clean_id(row.get('CNIC')),
-            'raw_area_text': None,
-            'resolution_method': 'all_lahore',
-            'resolved_zones': [],
-            'resolved_ucs': all_lahore_ucs,
-            'warnings': [],
-        })
+    for sheet_name, role in ROSTER_SHEETS:
+        df = pd.read_excel(xlsx_path, sheet_name=sheet_name, header=1)
+        for _, row in df.iterrows():
+            if pd.isna(row.get('Name')) or not str(row.get('Name')).strip():
+                continue
+            stats[role]['total'] += 1
+            sr = row.get('Sr. No.')
+            sheet_row = int(sr) if pd.notna(sr) else stats[role]['total']
+            method, ucs_list, warns = resolve_roster_row(
+                role, row.get('Town'), row.get('Zone Numbers'), row.get('UC Numbers'),
+                row.get('Area'), row.get('Workshop / Yard'), zone_to_ucs, town_to_ucs)
+            stats[role]['unresolved' if method == 'unresolved' else 'resolved'] += 1
+            employees.append({
+                'id': f"{role}-{sheet_row}",
+                'name': str(row['Name']).strip(),
+                'role': role,
+                'designation': _cell_str(row.get('Sub-Designation')),
+                'circle': _cell_str(row.get('Circle')),
+                'shift': _cell_str(row.get('Shift')),
+                'contact': _clean_id(row.get('Contact No')),
+                'cnic': _clean_id(row.get('CNIC')),
+                'raw_town': _cell_str(row.get('Town')),
+                'raw_area_text': _cell_str(row.get('Area')) or _cell_str(row.get('Workshop / Yard')),
+                'posting_type': _cell_str(row.get('Posting Type')),
+                'message': _cell_str(row.get('Message')),
+                'message_type': _cell_str(row.get('Message Type')),
+                'resolution_method': method,
+                'resolved_ucs': ucs_list,
+                'warnings': warns,
+            })
 
     roster_ucs = sorted({uc for e in employees for uc in e['resolved_ucs']})
     return employees, roster_ucs, stats, all_lahore_ucs
 
 def print_roster_report(employees, roster_ucs, stats, all_lahore_ucs):
     print(); print("=" * 55); print("EMPLOYEE ROSTER — coverage report"); print("=" * 55)
-    for role in ('TM', 'FM', 'AM_YARD', 'NIGHT_SHIFT'):
+    for _, role in ROSTER_SHEETS:
         s = stats[role]
-        print(f"{role}: {s['total']} rows -> {s['resolved']} resolved, "
-              f"{s['unresolved']} unresolved, {s['excluded']} excluded")
+        print(f"{role}: {s['total']} rows -> {s['resolved']} resolved, {s['unresolved']} unresolved")
     unresolved = [e for e in employees if e['resolution_method'] == 'unresolved']
     if unresolved:
         print("\nUnresolved (needs manual mapping):")
         for e in unresolved:
-            print(f"  - {e['name']} ({e['role']}): {e['raw_area_text']!r}")
-    approx = [e for e in employees if any('lettered sub-zone' in w for w in e['warnings'])]
-    if approx:
-        print("\nLettered sub-zone approximations (widened to the full parent zone):")
-        for e in approx:
-            print(f"  - {e['name']} ({e['role']}): {e['raw_area_text']!r}")
+            print(f"  - {e['name']} ({e['role']}): town={e['raw_town']!r} area={e['raw_area_text']!r}")
+    partial = [e for e in employees if any('partially matched' in w for w in e['warnings'])]
+    if partial:
+        print("\nPartially matched town lists (unmatched tokens ignored):")
+        for e in partial:
+            print(f"  - {e['name']} ({e['role']}): {e['raw_town']!r} -> {e['warnings']}")
     covered, total = len(roster_ucs), len(all_lahore_ucs)
     pct = round(100 * covered / total, 1) if total else 0
     print(f"\nRoster covers {covered}/{total} Lahore UCs ({pct}%)")
@@ -297,8 +287,34 @@ def main():
     lon                 = pd.to_numeric(lw['Longitude'], errors='coerce'); lw['lon'] = lon
     lw['code']          = lw['Tehsil'].str.replace('LWMC-','',regex=False)
     lw['district']      = lw['code'].map(TEHSIL_TO_DISTRICT).fillna('Other')
+
+    # Dashboard scope is Lahore city only -- UC/zone/town geometry, the
+    # employee roster, and the fleet targets are all Lahore-specific, so
+    # Sheikhupura/Kasur/Nankana Sahib vehicles are dropped here rather than
+    # carried through as dead weight nothing downstream can make use of.
+    n_before = len(lw)
+    lw = lw[lw['district'] == 'Lahore'].copy()
+    print(f"Scope: Lahore only -- kept {len(lw)}/{n_before} VTMS/LWMC rows "
+          f"({n_before - len(lw)} non-Lahore rows dropped)")
+
     lw['vkey']          = norm_key(lw['Vehicle'])
     lw['snapshot']      = SNAPSHOT_DATE
+
+    # fleet establishment registry (Reference Documents/town_targets.json,
+    # from extract_town_targets.py) -- gives each vehicle its REAL registered
+    # category/town by Vehicle ID, far more reliable than VTMS's own
+    # vehicle_type field (blank for most rows). Additive reference data: a
+    # missing/stale file degrades to "no registry match for anyone" rather
+    # than failing the build.
+    try:
+        fleet_registry = json.load(open(TOWN_TARGETS_JSON, encoding='utf-8'))
+    except Exception as e:
+        print(f"\nWARNING: could not load fleet registry ({TOWN_TARGETS_JSON}): {e}")
+        print("Run extract_town_targets.py first if 'Lahore Fleet+LRs.xlsx' is present.")
+        fleet_registry = {'towns': {}, 'vehicles': {}}
+    reg_vehicles = fleet_registry.get('vehicles', {})
+    lw['registry_category'] = lw['vkey'].map(lambda k: reg_vehicles.get(k, {}).get('category'))
+    lw['registry_town']     = lw['vkey'].map(lambda k: reg_vehicles.get(k, {}).get('town'))
 
     # enrich with LWMC status file (battery voltage, reporting status)
     # the export is sometimes a legacy .xls saved under an .xlsx name, so sniff
@@ -321,10 +337,28 @@ def main():
             for r in lw.itertuples()]
     lw['uc'], lw['uc_town'], lw['uc_zone'] = zip(*tags)
 
+    # assigned_town = the town a vehicle is actually registered to. Prefer
+    # the fleet registry (matched by Vehicle ID -- authoritative, covers
+    # ~96% of live vehicles); fall back to the tehsil-code-derived town
+    # (coarser, but covers everyone) only when a vehicle has no registry
+    # match. in_assigned_area compares that against where its live GPS
+    # currently places it. Only meaningful for the 9 Lahore towns -- a
+    # vehicle with no resolvable home town gets None, not False, since
+    # "assigned area" isn't defined for it here.
+    lw['assigned_town'] = lw['registry_town'].fillna(lw['code'].map(TEHSIL_TO_TOWN))
+    def _in_area(row):
+        if row['assigned_town'] is None or pd.isna(row['assigned_town']):
+            return None
+        if row['uc_town'] is None or pd.isna(row['uc_town']):
+            return False
+        return bool(row['assigned_town'] == row['uc_town'])
+    lw['in_assigned_area'] = lw.apply(_in_area, axis=1)
+
     keep = ['Vehicle ID','Vehicle','vkey','district','Office','Tehsil','Vehicle Type','Vehicle Used For',
             'Vehicle Status','Engine Status','distance_km','working_min','lat','lon',
             'Timestamp','Last Received At','reporting_status','status_text','battery_volt',
-            'tracker_offline','uc','uc_town','uc_zone','snapshot']
+            'tracker_offline','uc','uc_town','uc_zone','registry_category','assigned_town',
+            'in_assigned_area','snapshot']
     master = lw[keep].rename(columns={
         'Vehicle ID':'vehicle_id','Vehicle':'vehicle','Vehicle Type':'vehicle_type',
         'Vehicle Used For':'used_for','Vehicle Status':'status','Engine Status':'engine',
@@ -341,7 +375,7 @@ def main():
     print(f"Matched to LWMC status file: {master['reporting_status'].notna().sum()}")
     print(f"Assigned to a UC (Lahore city): {master['uc'].notna().sum()}")
     print()
-    print("By district:"); print(master['district'].value_counts().to_string())
+    print("By town:"); print(master['uc_town'].value_counts(dropna=False).to_string())
     print()
     print("By status:"); print(master['status'].value_counts().to_string())
     print(f"\nTotal distance today (km): {master['distance_km'].sum():,.0f}")
@@ -370,7 +404,7 @@ def main():
     cols = ['vehicle_id','vehicle','vkey','district','office','tehsil_code','vehicle_type',
             'used_for','status','engine','distance_km','working_min','lat','lon','timestamp',
             'last_received','reporting_status','status_text','battery_volt','tracker_offline',
-            'uc','uc_town','uc_zone','snapshot']
+            'uc','uc_town','uc_zone','registry_category','assigned_town','in_assigned_area','snapshot']
     import math
     def clean(v):
         if v is None: return None
@@ -385,6 +419,70 @@ def main():
         moving=('status', lambda s:(s=='moving').sum()),
         dist=('distance_km','sum')).round(0).to_dict('index')
 
+    # ---- town fleet targets vs. live-deployed (Reference Documents/town_targets.json) ----
+    # additive reference data, not part of the daily VTMS/roster inputs -- if
+    # it's missing or stale, degrade to an empty list rather than fail the build.
+    #
+    # Both targets (LR-only and full fleet) now come from the fleet
+    # establishment registry, and "deployed" is filtered by registry_category
+    # (joined by Vehicle ID) rather than VTMS's own vehicle_type field --
+    # that field is blank for most live rows, so text-matching against it
+    # undercounts badly. registry_category is populated for ~96% of the
+    # live fleet, giving a real apples-to-apples comparison for both figures.
+    try:
+        town_targets_raw = fleet_registry.get('towns', {})
+        if not town_targets_raw:
+            raise ValueError("registry loaded but has no 'towns' data")
+        lr = master[master['registry_category'] == 'Loader Rickshaw']
+        lr_actual = lr.dropna(subset=['uc_town']).groupby('uc_town').agg(
+            vehicles=('vkey','count'),
+            moving=('status', lambda s: (s == 'moving').sum()),
+        ).to_dict('index')
+        full_actual = master.dropna(subset=['uc_town']).groupby('uc_town').agg(
+            vehicles=('vkey','count'),
+            moving=('status', lambda s: (s == 'moving').sum()),
+        ).to_dict('index')
+        n_matched = master['registry_category'].notna().sum()
+        town_targets = []
+        for town, t in town_targets_raw.items():
+            lr_a = lr_actual.get(town, {'vehicles': 0, 'moving': 0})
+            full_a = full_actual.get(town, {'vehicles': 0, 'moving': 0})
+            target_lr = t['target_lr_vehicles']
+            target_total = t['target_total_vehicles']
+            lr_deployed = int(lr_a['vehicles'])
+            full_deployed = int(full_a['vehicles'])
+            town_targets.append({
+                'town': town,
+                'target_lr': target_lr,
+                'lr_deployed': lr_deployed,
+                'lr_moving': int(lr_a['moving']),
+                'lr_deployment_pct': round(100 * lr_deployed / target_lr, 1) if target_lr else None,
+                'target_total': target_total,
+                'full_fleet_deployed': full_deployed,
+                'full_fleet_moving': int(full_a['moving']),
+                'full_fleet_deployment_pct': round(100 * full_deployed / target_total, 1) if target_total else None,
+                'in_uc_geojson': t['in_uc_geojson'],
+            })
+        town_targets.sort(key=lambda x: -(x['target_total'] or 0))
+
+        print(); print("=" * 55); print("TOWN FLEET TARGETS — registry target vs. registry-matched live-deployed"); print("=" * 55)
+        print(f"Registry-matched: {n_matched}/{len(master)} live vehicles have a known registry category\n")
+        for tt in town_targets:
+            lr_pct = f"{tt['lr_deployment_pct']}%" if tt['lr_deployment_pct'] is not None else 'n/a'
+            full_pct = f"{tt['full_fleet_deployment_pct']}%" if tt['full_fleet_deployment_pct'] is not None else 'n/a'
+            print(f"{tt['town']:20s} LR target={tt['target_lr']:>4}  LR deployed={tt['lr_deployed']:>4} ({lr_pct})   |  "
+                  f"full target={tt['target_total']:>4}  full deployed={tt['full_fleet_deployed']:>4} ({full_pct})")
+
+        n_assignable = master['in_assigned_area'].notna().sum()
+        n_in_area = (master['in_assigned_area'] == True).sum()
+        print(f"\nIn assigned area (Lahore vehicles with a known home town): "
+              f"{n_in_area}/{n_assignable} currently within their own registered town "
+              f"({round(100*n_in_area/n_assignable,1) if n_assignable else 0}%)")
+    except Exception as e:
+        print(f"\nWARNING: could not compute town targets ({TOWN_TARGETS_JSON}): {e}")
+        print("Run extract_town_targets.py first if 'vehicle data.xlsx' is present.")
+        town_targets = []
+
     payload = {
         'snapshot': SNAPSHOT_DATE,
         'points': records,
@@ -393,6 +491,7 @@ def main():
                         'dist':float(v['dist'])} for k,v in agg.items()},
         'employees': employees,
         'roster_ucs': roster_ucs,
+        'town_targets': town_targets,
         'summary': {
             'total': len(master),
             'moving': int((master['status']=='moving').sum()),
@@ -403,7 +502,9 @@ def main():
             'total_distance': round(float(master['distance_km'].sum()),0),
             'not_reporting': int((master['reporting_status']=='Not Reporting').sum()),
             'no_activity': int((master['status_text']=='No Activity Since Yesterday').sum()),
-            'by_district': master['district'].value_counts().to_dict(),
+            'by_town': master['uc_town'].value_counts(dropna=True).to_dict(),
+            'assignable': int(master['in_assigned_area'].notna().sum()),
+            'in_assigned_area': int((master['in_assigned_area'] == True).sum()),
         }
     }
     json.dump(payload, open('dashboard_data.json','w'), allow_nan=False)
