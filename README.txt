@@ -1,4 +1,5 @@
-LWMC FLEET DASHBOARD — LOCAL KIT
+
+ LWMC FLEET DASHBOARD — LOCAL KIT
 ================================
 Scope: Lahore city only. build_master.py drops Sheikhupura/Kasur/Nankana Sahib
 rows at build time -- the UC/zone geometry, employee roster, and fleet
@@ -78,6 +79,45 @@ to a zone/UC/town -- e.g. a route or circle with no UC polygon) still show up
 in the dropdown, labeled "unresolved area", so gaps are visible rather than
 hidden -- check the build's printed roster report to fix those in the source
 spreadsheet.
+
+ZONES
+-----
+Zone (e.g. "Zone-37") sits between UC and Town in granularity -- Lahore has
+49 zones from lahore_ucs.geojson, each one a fixed group of UCs within a
+single town. The "Zone" dropdown (left sidebar, next to UC) filters every
+view the same way UC/Town do, and composes with them (AND, not OR). It's
+also read alongside the UC filter and roster Employee selection to decide
+which UCs get a permanent name label on the map instead of only on hover --
+with 274 UCs city-wide, always-on labels would just be clutter, so labels
+only appear once something (a zone, a single UC, or an employee) has scoped
+the view down. Each roster employee's "resolved_zones" (visible in the raw
+data / By Employee export) is derived from lahore_ucs.geojson's own UC->zone
+mapping applied to their resolved UCs -- so it reflects ground truth, not
+just whatever the roster sheet's free-text Zone Numbers column said. Excel
+export and the written report both got a "By Zone" sheet/section to match,
+and the Analytics tab has a "Top zones by distance" card.
+
+WORKING HOURS DISTRIBUTION
+---------------------------
+The Analytics tab, Excel export ("Working Hours" sheet), and written report
+all have a per-town table bucketing today's working time per vehicle into
+Below 2h / 2-4h / 4-6h / 6-8h / Above 8h, plus "% below 4h" and "% below 6h"
+columns -- the idea (and column shape) is borrowed from the org's own
+"Agency Wise Fleet Analysis" workbook (a province-wide Division-by-hours
+table), applied here at Town level since that's Lahore's closest equivalent
+to their "Division". This is a distinct dimension from Town Targets (which
+compares fleet counts against a target, not how long vehicles actually
+worked).
+
+NAVIGATION
+----------
+The left sidebar's Overview/Analytics/Map/Reports/Fleet table links jump to
+each section. Reports lives in the right-hand column and Fleet table in its
+own row at the bottom -- both scroll independently from the main
+Overview/Analytics/Map column, so clicking those two now sets the nav
+highlight immediately and briefly flashes the target section, instead of
+relying only on scroll position (which could miss them and look like the
+click did nothing).
 
 TOWN TARGETS & ASSIGNED-AREA STATUS
 -------------------------------------

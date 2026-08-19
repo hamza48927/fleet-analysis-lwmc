@@ -61,6 +61,8 @@
   .navlink:hover{background:rgba(255,255,255,.5);color:var(--ink)}
   .navlink.active{background:linear-gradient(155deg,var(--accent),var(--accent2));color:#eefdf8;box-shadow:var(--shadow)}
   .navlink.active svg{opacity:1}
+  @keyframes navFlash{0%{box-shadow:0 0 0 0 rgba(13,148,136,.45)}100%{box-shadow:0 0 0 10px rgba(13,148,136,0)}}
+  .nav-flash{animation:navFlash .8s ease-out;border-radius:16px}
   .nav-card{background:linear-gradient(160deg,var(--ink),#0a231c);border-radius:14px;padding:14px;
         color:#eefdf8;display:flex;flex-direction:column;gap:6px;margin-top:4px}
   .nav-card b{font-size:12.5px}
@@ -86,6 +88,9 @@
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .map-badge span{display:block;font-family:var(--mono);font-weight:400;font-size:10.5px;
         color:var(--mut);margin-top:2px;white-space:normal}
+  .uc-label{background:rgba(255,255,255,.9);border:1px solid var(--accent);border-radius:6px;
+        padding:1px 6px;font-size:10.5px;font-weight:700;color:var(--ink);box-shadow:none}
+  .uc-label::before{display:none}
   .panel{background:var(--panel);backdrop-filter:blur(var(--glass-blur)) saturate(160%);
          -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%);
          border:1px solid var(--line);border-radius:16px;padding:14px;
@@ -164,6 +169,13 @@
   .tt-head span{font-family:var(--mono)}
   .tt-bar{height:6px;border-radius:4px;background:var(--well);overflow:hidden;margin-bottom:2px}
   .tt-bar i{display:block;height:100%;border-radius:4px}
+  .hours-table{width:100%;border-collapse:collapse;font-size:11.5px}
+  .hours-table th{text-align:right;font-weight:600;color:var(--mut);font-size:10.5px;
+        padding:6px 8px;border-bottom:1px solid var(--line)}
+  .hours-table th:first-child,.hours-table td:first-child{text-align:left}
+  .hours-table td{text-align:right;padding:6px 8px;border-bottom:1px solid rgba(18,50,41,.06);
+        font-family:var(--mono);color:var(--ink)}
+  .hours-table tr.hours-total td{border-top:1.5px solid var(--line);border-bottom:none;font-weight:700}
   .tt-bar.target i{background:var(--dim)}
   .tt-bar.deployed i{background:linear-gradient(90deg,var(--accent),var(--accent2))}
   .tt-bar.deployed.full i{background:linear-gradient(90deg,#3b6fd6,#2454b0)}
@@ -411,6 +423,10 @@
           <select id="ucSel"><option value="">All UCs</option></select>
         </div>
         <div class="filter-group">
+          <div class="filter-label">Zone</div>
+          <select id="zoneSel"><option value="">All zones</option></select>
+        </div>
+        <div class="filter-group">
           <div class="filter-label">Vehicle type</div>
           <select id="typeSel"><option value="">All vehicle types</option></select>
         </div>
@@ -432,7 +448,7 @@
       <div class="note" id="coverageNote">Scope is Lahore city only — 285 UC polygons across 9 towns. Vehicles with GPS outside every
         UC polygon still show up in the fleet (use the UC filter's "Outside UC" option to isolate them).</div>
 
-      <div class="nav-card" id="navCard">
+      <div class="nav-card" id="navCard" title="Score = 40% moving + 40% online + 20% battery OK, out of 100, from the vehicles currently in view">
         <b>Fleet health</b>
         <span id="navCardBody">—</span>
       </div>
@@ -513,6 +529,18 @@
             <div class="note" style="margin-top:8px" id="assignedNote"></div>
           </div>
         </div>
+        <div style="height:12px"></div>
+        <div class="analytics-grid" style="grid-template-columns:1fr 1.4fr">
+          <div class="chart-card">
+            <div class="ch-head"><b>Top zones by distance</b></div>
+            <div class="leaderboard" id="zoneBoard"></div>
+          </div>
+          <div class="chart-card">
+            <div class="ch-head"><b>Working hours distribution by town</b></div>
+            <div id="hoursTable" style="overflow-x:auto"></div>
+            <div class="note" style="margin-top:8px">Idea borrowed from the Agency Wise Fleet Analysis workbook's Division-wise hours-worked breakdown, applied here at Town level. Buckets are today's working time per vehicle, not a target.</div>
+          </div>
+        </div>
       </section>
 
       <section class="panel" id="secMap">
@@ -534,6 +562,7 @@
           <span>composite score</span>
         </div>
         <div class="health" id="health"></div>
+        <div class="note" style="margin-top:8px">Score = 40% moving + 40% online + 20% battery OK (weighted, out of 100), computed from the vehicles currently in view. 75+ is "operating well", 50-74 is "needs attention", below 50 is "at risk".</div>
       </section>
 
       <section class="panel">
@@ -554,7 +583,7 @@
           <button class="reset" id="dlReport" style="flex:1">Download .txt</button>
         </div>
         <pre class="report-box" id="reportBox">Click "Generate report" to compile a written report from the vehicles currently in view (respects all filters above).</pre>
-        <div class="note" style="margin-top:10px">Excel workbook: Summary · By Town · By Office · By Vehicle Type · By UC · By Employee · Town Targets · Watchlist · Vehicle Detail — all built from the vehicles currently in view.</div>
+        <div class="note" style="margin-top:10px">Excel workbook: Summary · By Town · By Office · By Vehicle Type · By UC · By Zone · Working Hours · By Employee · Town Targets · Watchlist · Vehicle Detail — all built from the vehicles currently in view.</div>
         <button class="reset accent-btn" id="xlsxReport" style="width:100%;margin-top:8px">Export analytical report (.xlsx)</button>
         <div class="note" id="xlsxStatus" style="margin-top:6px"></div>
       </section>
@@ -585,10 +614,18 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script>
 const DATA = /*DATA*/;
 </script>
 <script>
+let DASHBOARD_BRIDGE = null;
+if (typeof qt !== 'undefined' && qt.webChannelTransport && typeof QWebChannel !== 'undefined') {
+  new QWebChannel(qt.webChannelTransport, channel => {
+    DASHBOARD_BRIDGE = channel.objects.dashboardBridge || null;
+    window.dashboardBridge = DASHBOARD_BRIDGE;
+  });
+}
 const STATUS_COLOR = {moving:'#16a34a', still:'#d97706', idle:'#2563eb'};
 const TOWN_ORDER = ['Allama Iqbal Town','Aziz Bhatti Town','DGBT','Gulberg Town','Nishter Town',
   'Ravi Town','Samnabad Town','Shalimar Town','Wagha Town'];
@@ -621,7 +658,7 @@ function rawRecordTableHtml(p){
 function rawRecordDetailHtml(p){
   return rawRecordPairs(p).map(([k,v])=>`<div class="detail-line"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
 }
-let state = {town:null, status:'all', recent:'all', conn:'all', uc:'', type:'', q:'',
+let state = {town:null, status:'all', recent:'all', conn:'all', uc:'', zone:'', type:'', q:'',
   date:'', timeFrom:'', timeTo:'', sort:'distance_km', dir:-1, selected:null,
   rosterScoped:false, employee:'', anomaly:''};
 function parseLastReceived(value){
@@ -640,6 +677,23 @@ const referenceTime = POINTS.reduce((acc, p) => p.last_received_ts && (!acc || p
 const ucOptions = [...new Map(POINTS.filter(p => p.uc).map(p => [p.uc, p])).values()]
   .sort((a,b) => a.uc.localeCompare(b.uc, undefined, {numeric:true}))
   .map(p => ({value: p.uc, label: `${p.uc} · ${p.uc_town || p.district}`}));
+
+// Zone dimension: built from lahore_ucs.geojson (the KML-derived source of
+// truth for zone/UC/town boundaries), same data the map's UC layer uses --
+// not from vehicle points, so a zone with zero vehicles currently in it
+// still appears in the dropdown.
+const ZONE_TO_UCS = {};
+const ZONE_TOWN = {};
+(DATA.ucs.features||[]).forEach(f=>{
+  const z = f.properties.zone, t = f.properties.town, uc = f.properties.uc;
+  if(!z) return;
+  if(!ZONE_TO_UCS[z]) ZONE_TO_UCS[z] = new Set();
+  ZONE_TO_UCS[z].add(uc);
+  ZONE_TOWN[z] = t;
+});
+function zoneSortKey(z){ const m = /Zone-(\d+)/.exec(z); return m ? +m[1] : 0; }
+const zoneOptions = Object.keys(ZONE_TO_UCS).sort((a,b)=>zoneSortKey(a)-zoneSortKey(b))
+  .map(z => ({value:z, label:`${z} · ${ZONE_TOWN[z]} (${ZONE_TO_UCS[z].size} UC${ZONE_TO_UCS[z].size===1?'':'s'})`}));
 const EMPLOYEES = (DATA.employees || []).map(e => ({...e, uc_set: new Set(e.resolved_ucs)}));
 const EMPLOYEE_BY_ID = new Map(EMPLOYEES.map(e => [e.id, e]));
 const ROSTER_UC_SET = new Set(DATA.roster_ucs || []);
@@ -677,9 +731,44 @@ function vehicleAnomalies(p){
   return ANOMALY_TYPES.filter(a=>a.test(p));
 }
 
+// Working-hours distribution: idea borrowed from the org's own "Agency Wise
+// Fleet Analysis" workbook (a province-wide Division-by-hours-worked-bucket
+// table) -- same shape, applied at our Town granularity since that's the
+// closest equivalent to their "Division" here.
+const WORK_BUCKETS = [
+  {key:'lt2',  label:'Below 2h', test:m=>m<120},
+  {key:'2to4', label:'2-4h',     test:m=>m>=120 && m<240},
+  {key:'4to6', label:'4-6h',     test:m=>m>=240 && m<360},
+  {key:'6to8', label:'6-8h',     test:m=>m>=360 && m<480},
+  {key:'gt8',  label:'Above 8h', test:m=>m>=480},
+];
+function buildHoursTable(rows){
+  const withHours = rows.filter(p=>p.working_min!=null);
+  const byTown = TOWN_ORDER.map(t=>{
+    const g = withHours.filter(p=>p.uc_town===t);
+    const counts = WORK_BUCKETS.map(b=>g.filter(p=>b.test(p.working_min)).length);
+    const total = g.length;
+    const below4 = counts[0]+counts[1];
+    const below6 = below4+counts[2];
+    return {town:t, counts, total,
+      pctBelow4: total ? Math.round(100*below4/total) : null,
+      pctBelow6: total ? Math.round(100*below6/total) : null};
+  }).filter(r=>r.total>0);
+  const totalsCounts = WORK_BUCKETS.map((b,i)=>byTown.reduce((s,r)=>s+r.counts[i],0));
+  const totalAll = byTown.reduce((s,r)=>s+r.total,0);
+  const totalBelow4 = totalsCounts[0]+totalsCounts[1];
+  const totalBelow6 = totalBelow4+totalsCounts[2];
+  const totals = {town:'All towns', counts:totalsCounts, total:totalAll,
+    pctBelow4: totalAll ? Math.round(100*totalBelow4/totalAll) : null,
+    pctBelow6: totalAll ? Math.round(100*totalBelow6/totalAll) : null};
+  return {rows:byTown, totals, excluded: rows.length - withHours.length};
+}
+
 document.getElementById('snap').innerHTML = '<span class="dot-live"></span>Snapshot ' + DATA.snapshot;
 document.getElementById('ucSel').innerHTML = '<option value="">All UCs</option><option value="outside">Outside UC</option>' +
   ucOptions.map(u => `<option value="${u.value}">${u.label}</option>`).join('');
+document.getElementById('zoneSel').innerHTML = '<option value="">All zones</option>' +
+  zoneOptions.map(z => `<option value="${z.value}">${z.label}</option>`).join('');
 const dateOptions = [...new Set(POINTS.map(p=>p.snapshot).filter(Boolean))].sort();
 document.getElementById('dateSel').innerHTML = '<option value="">All dates</option>' +
   dateOptions.map(d => `<option value="${d}">${d}</option>`).join('');
@@ -702,15 +791,51 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
   {attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:19}).addTo(map);
 
 // UC polygons
+const UC_STYLE_BASE = {opacity:.35, fillOpacity:.04};
+const UC_STYLE_HOVER = {opacity:.8, fillOpacity:.12};
+const UC_STYLE_HI = {opacity:.9, weight:2, fillOpacity:.16};
+function ucRestStyle(l){ return l._hi ? UC_STYLE_HI : UC_STYLE_BASE; }
 const ucLayer = L.geoJSON(DATA.ucs,{
   style:{color:'#0d9488', weight:1.2, opacity:.55, fillColor:'#0d9488', fillOpacity:.06},
   onEachFeature:(f,l)=>{
     const s = DATA.uc_stats[f.properties.uc] || {vehicles:0,moving:0,dist:0};
     l.bindTooltip(`<b>${f.properties.uc}</b> · ${f.properties.town}<br>${s.vehicles} vehicles · ${s.moving} moving`,{sticky:true});
-    l.on('mouseover',()=>l.setStyle({opacity:.8,fillOpacity:.12}));
-    l.on('mouseout',()=>l.setStyle({opacity:.35,fillOpacity:.04}));
+    l.on('mouseover',()=>l.setStyle(UC_STYLE_HOVER));
+    l.on('mouseout',()=>l.setStyle(ucRestStyle(l)));
   }
 }).addTo(map);
+
+// A handful of UCs get a permanent name label on the map (instead of only
+// on hover) whenever a Zone/UC/Employee filter narrows the view down to a
+// specific, small set -- with 274 UCs city-wide, always-on labels would
+// just be noise, so this only kicks in once something has scoped the view.
+function highlightedUcSet(){
+  if(state.zone) return ZONE_TO_UCS[state.zone] || new Set();
+  if(state.employee){
+    const emp = EMPLOYEE_BY_ID.get(state.employee);
+    if(emp && emp.uc_set.size) return emp.uc_set;
+  }
+  if(state.uc && state.uc !== 'outside') return new Set([state.uc]);
+  return null;
+}
+function updateUcLabels(){
+  const hi = highlightedUcSet();
+  ucLayer.eachLayer(l=>{
+    const props = l.feature && l.feature.properties;
+    if(!props) return;
+    const isHi = !!(hi && hi.has(props.uc));
+    if(isHi === !!l._hi) return;
+    l._hi = isHi;
+    l.unbindTooltip();
+    if(isHi){
+      l.bindTooltip(props.uc, {permanent:true, direction:'center', className:'uc-label', opacity:0.9});
+    } else {
+      const s = DATA.uc_stats[props.uc] || {vehicles:0,moving:0,dist:0};
+      l.bindTooltip(`<b>${props.uc}</b> · ${props.town}<br>${s.vehicles} vehicles · ${s.moving} moving`,{sticky:true});
+    }
+    l.setStyle(ucRestStyle(l));
+  });
+}
 
 const markerLayer = L.layerGroup().addTo(map);
 
@@ -778,6 +903,7 @@ function filtered(opts){
       if(state.uc === 'outside'){ if(p.uc) return false; }
       else if(p.uc !== state.uc) return false;
     }
+    if(state.zone && p.uc_zone !== state.zone) return false;
     if(state.rosterScoped){
       if(!p.uc || !ROSTER_UC_SET.has(p.uc)) return false;
     }
@@ -1136,6 +1262,37 @@ function drawLeaderboard(rows){
     </div>`;
   }).join('') : '<div class="note">No data in the current view.</div>';
 }
+function drawZoneBoard(rows){
+  const groups = groupRows(rows.filter(p=>p.uc_zone), p=>p.uc_zone);
+  const items = [...groups.entries()].map(([zone,g])=>({
+    zone, town: ZONE_TOWN[zone]||g[0].uc_town||'', count:g.length,
+    value: g.reduce((s,p)=>s+(p.distance_km||0),0)}));
+  const shown = items.sort((a,b)=>b.value-a.value).slice(0,8);
+  const max = Math.max(1, ...shown.map(x=>x.value));
+  const colors = ['#0d9488','#3b6fd6','#5b3fc9','#d97706','#16a34a'];
+  const el = document.getElementById('zoneBoard');
+  if(!shown.length){ el.innerHTML = '<div class="note">No data in the current view.</div>'; return; }
+  el.innerHTML = shown.map((x,i)=>{
+    const pct = Math.round(100*x.value/max);
+    return `<div class="lb-row">
+      <div class="lb-rank">#${i+1}</div>
+      <div class="lb-avatar" style="background:${colors[i%colors.length]}">${x.zone.replace('Zone-','')}</div>
+      <div class="lb-body"><b>${x.zone}</b><div class="lb-bar"><i style="width:${pct}%"></i></div><span style="font-size:10px;color:var(--mut)">${x.town} · ${fmt(x.count)} vehicles</span></div>
+      <div class="lb-val">${fmt(Math.round(x.value))}km</div>
+    </div>`;
+  }).join('') + (items.length>8 ? `<div class="note" style="margin-top:6px">Showing top 8 of ${items.length} zones with vehicles in view (of ${zoneOptions.length} total).</div>` : '');
+}
+function drawHoursTable(rows){
+  const {rows:byTown, totals, excluded} = buildHoursTable(rows);
+  const el = document.getElementById('hoursTable');
+  if(!byTown.length){ el.innerHTML = '<div class="note">No working-hours data in the current view.</div>'; return; }
+  const head = `<tr><th>Town</th>${WORK_BUCKETS.map(b=>`<th>${b.label}</th>`).join('')}<th>Total</th><th>% below 4h</th><th>% below 6h</th></tr>`;
+  const rowHtml = r => `<tr><td>${r.town}</td>${r.counts.map(c=>`<td>${fmt(c)}</td>`).join('')}<td><b>${fmt(r.total)}</b></td>` +
+    `<td>${r.pctBelow4==null?'—':r.pctBelow4+'%'}</td><td>${r.pctBelow6==null?'—':r.pctBelow6+'%'}</td></tr>`;
+  el.innerHTML = `<table class="hours-table"><thead>${head}</thead><tbody>` +
+    byTown.map(rowHtml).join('') + rowHtml(totals).replace('<tr>','<tr class="hours-total">') + `</tbody></table>` +
+    (excluded ? `<div class="note" style="margin-top:8px">${fmt(excluded)} vehicles in view have no working-hours reading and are excluded from this table.</div>` : '');
+}
 function drawPredictions(rows){
   const activeSoon = rows.filter(p => ageHours(p) <= 4 && p.status === 'moving').length;
   const riskOffline = rows.filter(p => !isOnline(p) || ageHours(p) > 8).length;
@@ -1188,7 +1345,7 @@ function drawHealth(rows){
     </div>
     <div class="health-body">
       <div class="health-verdict" style="color:${color}">${verdict}</div>
-      <div class="health-sub">${fmt(Math.round(movingPct*100))}% moving · ${fmt(Math.round(onlinePct*100))}% online · ${fmt(Math.round(batteryOkPct*100))}% battery OK, from ${fmt(rows.length)} vehicles in view.</div>
+      <div class="health-sub">${fmt(Math.round(movingPct*100))}% moving (40%) · ${fmt(Math.round(onlinePct*100))}% online (40%) · ${fmt(Math.round(batteryOkPct*100))}% battery OK (20%), from ${fmt(rows.length)} vehicles in view.</div>
     </div>`;
 }
 function drawSelected(rows){
@@ -1275,6 +1432,7 @@ function buildReportText(rows){
   lines.push(`Recent activity: ${state.recent==='all' ? 'All' : 'last '+state.recent+'h'}`);
   lines.push(`Connectivity   : ${state.conn}`);
   lines.push(`UC             : ${state.uc || 'All'}`);
+  lines.push(`Zone           : ${state.zone || 'All'}`);
   lines.push(`Vehicle type   : ${state.type || 'All'}`);
   lines.push(`Search         : ${state.q || '(none)'}`);
   lines.push(`Roster mode    : ${state.rosterScoped ? 'Roster-scoped (Lahore, roster UCs only)' : 'Full fleet'}`);
@@ -1297,6 +1455,21 @@ function buildReportText(rows){
     const r = rows.filter(p=>p.uc_town===t);
     lines.push(`${t.padEnd(20)} ${fmt(r.length).padStart(6)} vehicles  |  ${fmt(r.filter(p=>p.status==='moving').length).padStart(5)} moving  |  ${fmt(r.reduce((s,p)=>s+(p.distance_km||0),0),0).padStart(7)} km`);
   });
+  lines.push('');
+  lines.push('BY ZONE'); lines.push(rule);
+  buildZoneSheet(rows).slice(1).forEach(r=>{
+    lines.push(`${String(r[0]).padEnd(10)} ${String(r[1]).padEnd(20)} ${fmt(r[2]).padStart(3)} UCs  |  ${fmt(r[3]).padStart(6)} vehicles  |  ${fmt(r[4]).padStart(5)} moving  |  ${fmt(r[5],0).padStart(7)} km`);
+  });
+  lines.push('');
+  lines.push('WORKING HOURS DISTRIBUTION (by town)'); lines.push(rule);
+  {
+    const {rows: hRows, totals: hTotals} = buildHoursTable(rows);
+    lines.push(`${'Town'.padEnd(20)} ${WORK_BUCKETS.map(b=>b.label.padStart(9)).join(' ')} ${'Total'.padStart(8)} ${'<4h'.padStart(6)} ${'<6h'.padStart(6)}`);
+    hRows.forEach(r=>{
+      lines.push(`${r.town.padEnd(20)} ${r.counts.map(c=>fmt(c).padStart(9)).join(' ')} ${fmt(r.total).padStart(8)} ${(r.pctBelow4==null?'—':r.pctBelow4+'%').padStart(6)} ${(r.pctBelow6==null?'—':r.pctBelow6+'%').padStart(6)}`);
+    });
+    lines.push(`${hTotals.town.padEnd(20)} ${hTotals.counts.map(c=>fmt(c).padStart(9)).join(' ')} ${fmt(hTotals.total).padStart(8)} ${(hTotals.pctBelow4==null?'—':hTotals.pctBelow4+'%').padStart(6)} ${(hTotals.pctBelow6==null?'—':hTotals.pctBelow6+'%').padStart(6)}`);
+  }
   lines.push('');
   lines.push('BY EMPLOYEE (roster)'); lines.push(rule);
   if(EMPLOYEES.length){
@@ -1473,6 +1646,15 @@ function buildXlsx(sheets){
   return makeZip(files);
 }
 
+function bytesToBase64(bytes){
+  let binary = '';
+  const chunkSize = 0x8000;
+  for(let i = 0; i < bytes.length; i += chunkSize){
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 // ---- analytical report sheets ----
 function groupRows(rows, keyFn){
   const map = new Map();
@@ -1514,6 +1696,7 @@ function buildSummarySheet(rows){
     ['Recent activity', state.recent==='all' ? 'All' : 'last '+state.recent+'h'],
     ['Connectivity', state.conn],
     ['UC', state.uc || 'All'],
+    ['Zone', state.zone || 'All'],
     ['Vehicle type', state.type || 'All'],
     ['Search', state.q || '(none)'],
     ['Roster mode', state.rosterScoped ? 'Roster-scoped' : 'Full fleet'],
@@ -1560,6 +1743,22 @@ function buildUcSheet(rows){
   [...groups.entries()].sort((a,b)=> b[1].length - a[1].length).forEach(([uc, g])=>{
     out.push([uc, g[0].uc_town||'', g.length, g.filter(p=>p.status==='moving').length, Math.round(g.reduce((s,p)=>s+(p.distance_km||0),0)*100)/100]);
   });
+  return out;
+}
+function buildZoneSheet(rows){
+  const groups = groupRows(rows.filter(p=>p.uc_zone), p=>p.uc_zone);
+  const out = [['Zone','Town','UCs in zone','Vehicles','Moving','Total distance (km)']];
+  [...groups.entries()].sort((a,b)=>zoneSortKey(a[0])-zoneSortKey(b[0])).forEach(([zone, g])=>{
+    out.push([zone, ZONE_TOWN[zone]||g[0].uc_town||'', (ZONE_TO_UCS[zone]||new Set()).size, g.length,
+      g.filter(p=>p.status==='moving').length, Math.round(g.reduce((s,p)=>s+(p.distance_km||0),0)*100)/100]);
+  });
+  return out;
+}
+function buildHoursSheet(rows){
+  const {rows:byTown, totals} = buildHoursTable(rows);
+  const out = [['Town', ...WORK_BUCKETS.map(b=>b.label), 'Total', '% below 4h', '% below 6h']];
+  byTown.forEach(r=>out.push([r.town, ...r.counts, r.total, r.pctBelow4==null?'':r.pctBelow4, r.pctBelow6==null?'':r.pctBelow6]));
+  out.push(['All towns', ...totals.counts, totals.total, totals.pctBelow4==null?'':totals.pctBelow4, totals.pctBelow6==null?'':totals.pctBelow6]);
   return out;
 }
 function buildEmployeeSheet(rows){
@@ -1615,19 +1814,29 @@ function exportExcelReport(){
       {name:'By Office', rows: groupStatsRows(rows, p=>p.office, 'Office')},
       {name:'By Vehicle Type', rows: groupStatsRows(rows, p=>p.vehicle_type, 'Vehicle type')},
       {name:'By UC', rows: buildUcSheet(rows)},
+      {name:'By Zone', rows: buildZoneSheet(rows)},
+      {name:'Working Hours', rows: buildHoursSheet(rows)},
       {name:'By Employee', rows: buildEmployeeSheet(rows)},
       {name:'Town Targets', rows: buildTownTargetSheet(rows)},
       {name:'Watchlist', rows: buildWatchlistSheet(rows)},
       {name:'Vehicle Detail', rows: buildDetailSheet(rows)},
     ];
     const bytes = buildXlsx(sheets);
+    const stamp = (state.date || DATA.snapshot) + '_' + String(referenceTime.getHours()).padStart(2,'0') + String(referenceTime.getMinutes()).padStart(2,'0');
+    const filename = `LWMC_Fleet_Report_${stamp}.xlsx`;
+    const bridge = window.dashboardBridge || DASHBOARD_BRIDGE;
+    if (bridge && typeof bridge.saveXlsx === 'function') {
+      const saved = bridge.saveXlsx(bytesToBase64(bytes), filename);
+      if (!saved) throw new Error('Desktop save bridge rejected the workbook.');
+      status.textContent = `Exported ${fmt(rows.length)} vehicles across ${sheets.length} sheets to ${filename}.`;
+      return;
+    }
     const blob = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const url = URL.createObjectURL(blob);
-    const stamp = (state.date || DATA.snapshot) + '_' + String(referenceTime.getHours()).padStart(2,'0') + String(referenceTime.getMinutes()).padStart(2,'0');
     const a = document.createElement('a');
-    a.href = url; a.download = `LWMC_Fleet_Report_${stamp}.xlsx`;
+    a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     status.textContent = `Exported ${fmt(rows.length)} vehicles across ${sheets.length} sheets.`;
   } catch(e){
     status.textContent = 'Export failed: ' + e.message;
@@ -1656,7 +1865,8 @@ function render(fit=false){
   drawOverview(rows); drawHealth(rows); drawPredictions(rows); drawSelected(rows);
   drawStatCards(rows); drawComboChart(rows); drawDonuts(rows); drawRecencyFunnel(rows); drawLeaderboard(rows);
   drawTownTargets(rows); drawAssignedDonut(rows); drawAnomalies(rows);
-  drawMarkers(rows); drawTable(rows); updateMapBadge(rows);
+  drawZoneBoard(rows); drawHoursTable(rows);
+  drawMarkers(rows); drawTable(rows); updateMapBadge(rows); updateUcLabels();
   document.getElementById('tcount').textContent = fmt(rows.length)+' shown';
   const timeBit = (state.timeFrom || state.timeTo) ? ` · ${state.timeFrom||'00:00'}-${state.timeTo||'23:59'}` : '';
   const empBit = state.employee ? ` · ${(EMPLOYEE_BY_ID.get(state.employee)||{}).name || ''}` : '';
@@ -1667,7 +1877,7 @@ function render(fit=false){
   }
   document.getElementById('filterSummary').textContent =
     `Showing ${fmt(rows.length)} vehicles · ${fmt(rows.filter(p=>isOnline(p)).length)} online · ` +
-    `${state.recent==='all'?'all recency':`last ${state.recent}h`} · ${state.uc || 'all UCs'} · ${state.date || 'all dates'}${timeBit}` +
+    `${state.recent==='all'?'all recency':`last ${state.recent}h`} · ${state.uc || 'all UCs'} · ${state.zone || 'all zones'} · ${state.date || 'all dates'}${timeBit}` +
     `${state.rosterScoped ? ' · roster-scoped' : ''}${empBit}${searchBit}`;
   if(fit && rows.length){
     const b=L.latLngBounds(rows.filter(p=>p.lat!=null).map(p=>[p.lat,p.lon]));
@@ -1692,6 +1902,7 @@ const types=[...new Set(POINTS.map(p=>p.vehicle_type).filter(Boolean))].sort();
 document.getElementById('typeSel').innerHTML='<option value="">All vehicle types</option>'+
   types.map(t=>`<option value="${t}">${t}</option>`).join('');
 document.getElementById('ucSel').onchange=e=>{state.uc=e.target.value; render();};
+document.getElementById('zoneSel').onchange=e=>{state.zone=e.target.value; render();};
 document.getElementById('typeSel').onchange=e=>{state.type=e.target.value; render();};
 document.getElementById('dateSel').onchange=e=>{state.date=e.target.value; render();};
 document.getElementById('timeFrom').onchange=e=>{state.timeFrom=e.target.value; render();};
@@ -1704,20 +1915,36 @@ document.getElementById('topSearch').oninput=e=>{
 };
 document.getElementById('genReportHeader').onclick = generateReport;
 document.getElementById('xlsxReportHeader').onclick = exportExcelReport;
+// Overview/Analytics/Map live in the '.content' scroll column; Reports
+// lives in the separate '.right' sidebar column and Fleet table in its own
+// '.bottom' region -- each scrolls independently, so a click on those two
+// can leave '.content' untouched and look like nothing happened. Setting
+// the active state directly on click (instead of relying only on the
+// '.content' scroll-spy below) and flashing the target section makes every
+// nav click give immediate, visible feedback regardless of which container
+// actually moves.
 document.getElementById('navList').querySelectorAll('.navlink').forEach(link=>{
   link.onclick = () => {
     const el = document.getElementById(link.dataset.target);
-    if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+    if(!el) return;
+    document.getElementById('navList').querySelectorAll('.navlink').forEach(l=>l.classList.toggle('active', l===link));
+    el.scrollIntoView({behavior:'smooth', block:'start'});
+    el.classList.remove('nav-flash');
+    void el.offsetWidth; // restart the animation even on repeated clicks
+    el.classList.add('nav-flash');
+    setTimeout(()=>el.classList.remove('nav-flash'), 850);
   };
 });
 document.querySelector('.content').addEventListener('scroll', () => {
-  const links = [...document.getElementById('navList').querySelectorAll('.navlink')];
+  const links = [...document.getElementById('navList').querySelectorAll('.navlink')]
+    .filter(l => ['secOverview','secAnalytics','secMap'].includes(l.dataset.target));
   const positions = links.map(l => {
     const el = document.getElementById(l.dataset.target);
     return el ? Math.abs(el.getBoundingClientRect().top - 90) : Infinity;
   });
   const closest = positions.indexOf(Math.min(...positions));
-  links.forEach((l,i) => l.classList.toggle('active', i===closest));
+  const allLinks = [...document.getElementById('navList').querySelectorAll('.navlink')];
+  allLinks.forEach(l => l.classList.toggle('active', l===links[closest]));
 }, {passive:true});
 document.getElementById('modeToggle').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
   document.getElementById('modeToggle').querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
@@ -1730,12 +1957,13 @@ document.getElementById('reset').onclick=()=>{
   // "Reset filters" clears every filter, including the employee dropdown --
   // roster-scoped mode is a mode switch, not a same-tier filter, so it's
   // the one thing left alone here, with its own explicit toggle-off in the top bar.
-  state={town:null,status:'all',recent:'all',conn:'all',uc:'',type:'',q:'',
+  state={town:null,status:'all',recent:'all',conn:'all',uc:'',zone:'',type:'',q:'',
     date:'',timeFrom:'',timeTo:'',sort:'distance_km',dir:-1,
     rosterScoped:state.rosterScoped, employee:'', anomaly:''};
   document.getElementById('typeSel').value=''; document.getElementById('search').value='';
   document.getElementById('topSearch').value='';
-  document.getElementById('ucSel').value=''; document.getElementById('dateSel').value='';
+  document.getElementById('ucSel').value=''; document.getElementById('zoneSel').value='';
+  document.getElementById('dateSel').value='';
   document.getElementById('timeFrom').value=''; document.getElementById('timeTo').value='';
   document.getElementById('empSel').value=''; document.getElementById('anomalySel').value='';
   document.querySelectorAll('#statusChips .chip').forEach(x=>x.classList.toggle('on',x.dataset.s==='all'));

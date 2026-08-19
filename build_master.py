@@ -208,11 +208,16 @@ def resolve_roster_row(role, town_raw, zone_nums_raw, uc_nums_raw, area_raw, wor
             return 'town_wildcard', ucs_list, []
     return 'unresolved', [], []
 
+def _zone_sort_key(z):
+    m = re.match(r'Zone-(\d+)', z)
+    return int(m.group(1)) if m else 0
+
 def load_employee_roster(xlsx_path, ucs):
-    zone_to_ucs, town_to_ucs = {}, {}
+    zone_to_ucs, town_to_ucs, uc_to_zones = {}, {}, {}
     for u in ucs:
         zone_to_ucs.setdefault(u['zone'], set()).add(u['uc'])
         town_to_ucs.setdefault(u['town'], set()).add(u['uc'])
+        uc_to_zones.setdefault(u['uc'], set()).add(u['zone'])
     zone_to_ucs = {k: sorted(v) for k, v in zone_to_ucs.items()}
     town_to_ucs = {k: sorted(v) for k, v in town_to_ucs.items()}
     all_lahore_ucs = sorted({u['uc'] for u in ucs})
@@ -232,6 +237,13 @@ def load_employee_roster(xlsx_path, ucs):
                 role, row.get('Town'), row.get('Zone Numbers'), row.get('UC Numbers'),
                 row.get('Area'), row.get('Workshop / Yard'), zone_to_ucs, town_to_ucs)
             stats[role]['unresolved' if method == 'unresolved' else 'resolved'] += 1
+            # Zones covered, derived from the KML/geojson's own UC->zone
+            # mapping applied to the UCs just resolved above -- this reflects
+            # ground truth (lahore_ucs.geojson) rather than re-echoing the
+            # roster's raw "Zone Numbers" text, so it's correct regardless of
+            # which resolution path (explicit UC list / zone list / town
+            # wildcard) actually produced ucs_list.
+            zones = sorted({z for uc in ucs_list for z in uc_to_zones.get(uc, ())}, key=_zone_sort_key)
             employees.append({
                 'id': f"{role}-{sheet_row}",
                 'name': str(row['Name']).strip(),
@@ -247,6 +259,7 @@ def load_employee_roster(xlsx_path, ucs):
                 'message': _cell_str(row.get('Message')),
                 'message_type': _cell_str(row.get('Message Type')),
                 'resolution_method': method,
+                'resolved_zones': zones,
                 'resolved_ucs': ucs_list,
                 'warnings': warns,
             })
