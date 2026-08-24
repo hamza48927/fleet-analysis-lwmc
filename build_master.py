@@ -18,12 +18,12 @@ import pandas as pd, numpy as np, json, sys, re
 from pathlib import Path
 
 # ---------- config ----------
-VTMS_CSV = "export-vtms-active-logs-11-08-2026-11_31_03.csv"
-LWMC_XLS = "vs.xlsx"                       # converted from the .xls export
+VTMS_CSV = "export-vtms-active-logs-19-08-2026-14_36_28.csv"
+LWMC_XLS = "Vehicle_Status_2026-08-19T09_43_21.981Z.xls"  # converted from the .xls export
 UC_GEOJSON = "lahore_ucs.geojson"
 EMPLOYEE_XLSX = "employee sheet caping.xlsx"  # TM/FM/ZO/AM-Yard/MVI roster (performance scoping)
 TOWN_TARGETS_JSON = "Reference Documents/town_targets.json"  # from extract_town_targets.py
-SNAPSHOT_DATE = "2026-08-11"
+SNAPSHOT_DATE = "2026-08-19"
 
 TEHSIL_TO_DISTRICT = {
     'AlIT':'Lahore','ShTo':'Lahore','RaTo':'Lahore','NiTo':'Lahore','WaTo':'Lahore',
@@ -510,7 +510,8 @@ def main():
             'moving': int((master['status']=='moving').sum()),
             'idle': int((master['status']=='idle').sum()),
             'still': int((master['status']=='still').sum()),
-            'engine_on': int((master['engine']=='on').sum()),
+            'engine_on': 
+            .((master['engine']=='on').sum()),
             'idling_waste': int(((master['engine']=='on') & (master['status']!='moving')).sum()),
             'total_distance': round(float(master['distance_km'].sum()),0),
             'not_reporting': int((master['reporting_status']=='Not Reporting').sum()),
