@@ -45,9 +45,28 @@
         display:flex;align-items:center;gap:7px}
   .snap .dot-live{width:6px;height:6px;border-radius:50%;background:var(--moving);
         box-shadow:0 0 0 3px #16a34a2e}
-  .legend{margin-left:auto;display:flex;gap:16px;font-size:12px;color:var(--mut)}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--mut)}
   .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
   .icon{width:14px;height:14px;vertical-align:-2px;margin-right:6px;opacity:.85}
+  .search-wrap{position:relative;flex:0 1 320px}
+  .search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--dim)}
+  .search-wrap input{padding-left:34px;background:rgba(255,255,255,.5)}
+  .topbar-spacer{margin-left:auto}
+
+  /* nav (dashboard.webp-style sidebar navigation) */
+  .navlist{display:flex;flex-direction:column;gap:3px}
+  .navlink{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;
+        font-size:12.5px;font-weight:600;color:var(--mut);cursor:pointer;user-select:none;transition:.15s}
+  .navlink svg{width:15px;height:15px;flex:0 0 auto;opacity:.8}
+  .navlink:hover{background:rgba(255,255,255,.5);color:var(--ink)}
+  .navlink.active{background:linear-gradient(155deg,var(--accent),var(--accent2));color:#eefdf8;box-shadow:var(--shadow)}
+  .navlink.active svg{opacity:1}
+  @keyframes navFlash{0%{box-shadow:0 0 0 0 rgba(13,148,136,.45)}100%{box-shadow:0 0 0 10px rgba(13,148,136,0)}}
+  .nav-flash{animation:navFlash .8s ease-out;border-radius:16px}
+  .nav-card{background:linear-gradient(160deg,var(--ink),#0a231c);border-radius:14px;padding:14px;
+        color:#eefdf8;display:flex;flex-direction:column;gap:6px;margin-top:4px}
+  .nav-card b{font-size:12.5px}
+  .nav-card span{font-size:10.5px;color:#bcd9cd;line-height:1.5}
 
   /* body split: filters | main content | detail rail */
   .mid{display:grid;grid-template-columns:328px minmax(0,1fr) 356px;min-height:0}
@@ -61,6 +80,17 @@
         overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:14px}
   .content{min-width:0;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:14px}
   #map{width:100%;height:360px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+  .map-wrap{position:relative}
+  .map-badge{position:absolute;top:12px;left:12px;z-index:1000;max-width:calc(100% - 24px);
+        background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border:1px solid var(--line);
+        border-left:3px solid var(--accent);border-radius:9px;padding:7px 12px;
+        font-size:12px;font-weight:600;color:var(--ink);box-shadow:var(--shadow);
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .map-badge span{display:block;font-family:var(--mono);font-weight:400;font-size:10.5px;
+        color:var(--mut);margin-top:2px;white-space:normal}
+  .uc-label{background:rgba(255,255,255,.9);border:1px solid var(--accent);border-radius:6px;
+        padding:1px 6px;font-size:10.5px;font-weight:700;color:var(--ink);box-shadow:none}
+  .uc-label::before{display:none}
   .panel{background:var(--panel);backdrop-filter:blur(var(--glass-blur)) saturate(160%);
          -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%);
          border:1px solid var(--line);border-radius:16px;padding:14px;
@@ -77,6 +107,80 @@
   .mini-card .n{font-family:var(--mono);font-size:23px;font-weight:700;color:var(--accent2)}
   .mini-card .l{font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-top:3px}
   .mini-card .s{font-size:11.5px;color:var(--ink);margin-top:6px;line-height:1.4}
+
+  /* content header (dashboard.webp-style title + actions) */
+  .page-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:2px 2px 4px}
+  .page-head h1{font-size:20px;margin:0;color:var(--ink);letter-spacing:-.2px}
+  .page-head p{font-size:12px;color:var(--mut);margin:3px 0 0}
+  .page-actions{display:flex;gap:8px;flex:0 0 auto}
+  .page-actions button{width:auto;padding:9px 16px;white-space:nowrap}
+
+  /* gradient stat-card row (design.jpg-style) */
+  .stat-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+  .stat-card{border-radius:16px;padding:14px 16px;color:#eefdf8;position:relative;overflow:hidden;
+        min-height:96px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:var(--shadow)}
+  .stat-card .stat-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .stat-card .stat-label{font-size:11px;letter-spacing:.3px;opacity:.85;font-weight:600}
+  .stat-card .stat-n{font-family:var(--mono);font-size:24px;font-weight:800;margin-top:2px}
+  .stat-card .stat-sub{font-size:10.5px;opacity:.8;margin-top:2px}
+  .stat-card .mini-viz{position:absolute;right:10px;bottom:8px;opacity:.9}
+  .stat-card.c1{background:linear-gradient(150deg,#1a8f5c,#0f5c3a)}
+  .stat-card.c2{background:linear-gradient(150deg,#0d9488,#0a5c53)}
+  .stat-card.c3{background:linear-gradient(150deg,#3b6fd6,#5b3fc9)}
+  .stat-card.c4{background:linear-gradient(150deg,#123229,#0a1b16)}
+
+  /* analytics grid (design.jpg chart style) */
+  .analytics-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:12px}
+  .chart-card{background:var(--panel);backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+        -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+        border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
+  .chart-card .ch-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .chart-card .ch-head b{font-size:13px;color:var(--ink)}
+  .chart-legend{display:flex;gap:12px;font-size:10.5px;color:var(--mut)}
+  .chart-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
+  .donut-wrap{display:flex;align-items:center;gap:14px}
+  .donut{width:120px;height:120px;border-radius:50%;flex:0 0 auto;position:relative}
+  .donut .hole{position:absolute;inset:20px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);
+        display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .donut .hole b{font-family:var(--mono);font-size:19px;color:var(--ink)}
+  .donut .hole span{font-size:9px;color:var(--mut);text-transform:uppercase}
+  .donut-legend{display:flex;flex-direction:column;gap:8px;font-size:11.5px}
+  .donut-legend .row{display:flex;justify-content:space-between;gap:12px;align-items:center}
+  .donut-legend .row .k{display:flex;align-items:center;gap:7px;color:var(--ink)}
+  .donut-legend .row .k i{width:9px;height:9px;border-radius:50%}
+  .donut-legend .row .v{font-family:var(--mono);color:var(--mut)}
+  .funnel-wrap{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .funnel-stage{display:flex;flex-direction:column;align-items:center;justify-content:center;
+        color:#fff;font-size:11px;font-weight:700;padding:8px 4px;min-height:34px}
+  .funnel-stage span{font-size:9.5px;font-weight:600;opacity:.85;text-transform:uppercase}
+  .leaderboard{display:flex;flex-direction:column;gap:10px}
+  .lb-row{display:grid;grid-template-columns:22px 30px 1fr 46px;gap:10px;align-items:center}
+  .lb-rank{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:center}
+  .lb-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+        color:#fff;font-weight:700;font-size:11px;flex:0 0 auto}
+  .lb-body b{font-size:12px;color:var(--ink);display:block}
+  .lb-bar{height:5px;border-radius:3px;background:var(--well);margin-top:5px;overflow:hidden}
+  .lb-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px}
+  .lb-val{font-family:var(--mono);font-size:11px;color:var(--mut);text-align:right}
+  .tt-row{padding:8px 0;border-bottom:1px solid rgba(18,50,41,.08)}
+  .tt-row:last-child{border-bottom:none}
+  .tt-town{font-size:12px;color:var(--ink);font-weight:700;margin-bottom:5px}
+  .tt-head{display:flex;justify-content:space-between;font-size:10.5px;color:var(--mut);margin-bottom:4px}
+  .tt-head span{font-family:var(--mono)}
+  .tt-bar{height:6px;border-radius:4px;background:var(--well);overflow:hidden;margin-bottom:2px}
+  .tt-bar i{display:block;height:100%;border-radius:4px}
+  .hours-table{width:100%;border-collapse:collapse;font-size:11.5px}
+  .hours-table th{text-align:right;font-weight:600;color:var(--mut);font-size:10.5px;
+        padding:6px 8px;border-bottom:1px solid var(--line)}
+  .hours-table th:first-child,.hours-table td:first-child{text-align:left}
+  .hours-table td{text-align:right;padding:6px 8px;border-bottom:1px solid rgba(18,50,41,.06);
+        font-family:var(--mono);color:var(--ink)}
+  .hours-table tr.hours-total td{border-top:1.5px solid var(--line);border-bottom:none;font-weight:700}
+  .tt-bar.target i{background:var(--dim)}
+  .tt-bar.deployed i{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .tt-bar.deployed.full i{background:linear-gradient(90deg,#3b6fd6,#2454b0)}
+  .tt-pair{margin-bottom:6px}
+  .tt-pair:last-child{margin-bottom:0}
 
   /* fleet health gauge */
   .health{display:flex;align-items:center;gap:16px}
@@ -127,7 +231,7 @@
   .sect{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;
         margin:2px 0 -4px;font-weight:600}
 
-  /* district rail (signature) */
+  /* town rail (signature) */
   .rail{display:flex;flex-direction:column;gap:6px}
   .drow{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;
         cursor:pointer;transition:.15s;position:relative;overflow:hidden}
@@ -147,16 +251,45 @@
   .date-block .d{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--accent2)}
   .date-block .s{font-size:11px;color:var(--mut);line-height:1.5}
 
+  /* anomalies */
+  .anomaly-list{display:flex;flex-direction:column;gap:5px}
+  .anomaly-row{display:flex;justify-content:space-between;align-items:center;background:var(--panel2);
+        border:1px solid var(--line);border-radius:8px;padding:6px 9px;cursor:pointer;
+        font-size:11px;color:var(--ink);transition:.15s}
+  .anomaly-row:hover{border-color:var(--off)}
+  .anomaly-row.active{border-color:var(--off);box-shadow:inset 0 0 0 1px var(--off)}
+  .anomaly-row .n{font-family:var(--mono);color:var(--off);font-weight:700;flex:0 0 auto;margin-left:8px}
+  .anomaly-row.zero{opacity:.5;cursor:default}
+  .anomaly-row.zero .n{color:var(--mut)}
+
   /* filters */
   .filt{display:flex;flex-direction:column;gap:10px}
   .time-range{display:flex;align-items:center;gap:6px}
   .time-range input{width:auto;flex:1}
   .time-range span{font-size:11px;color:var(--dim)}
-  .filter-group{display:flex;flex-direction:column;gap:6px}
+  .filter-group{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);
+        border-radius:10px;padding:9px 10px 10px;background:rgba(255,255,255,.35)}
   .filter-label{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;font-weight:600}
   select,input{width:100%;background:rgba(255,255,255,.55);color:var(--ink);border:1px solid var(--line);
         border-radius:9px;padding:8px 10px;font-size:12.5px;font-family:var(--sans)}
   input::placeholder{color:var(--dim)}
+  .ssel-wrap{position:relative}
+  .ssel-native{display:none}
+  .ssel-input{cursor:text;padding-right:28px}
+  .ssel-input:focus{outline:none;border-color:var(--accent)}
+  .ssel-arrow{position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;
+        color:var(--mut);display:flex;transition:transform .15s ease}
+  .ssel-wrap.open .ssel-arrow{transform:translateY(-50%) rotate(180deg);color:var(--accent2)}
+  .ssel-panel{display:none;position:fixed;z-index:5000;max-height:240px;overflow-y:auto;
+        background:#eefdf9;border:1px solid var(--line);border-radius:9px;
+        box-shadow:var(--shadow);padding:4px}
+  .ssel-panel.open{display:block}
+  .ssel-group{font-size:10px;color:var(--accent2);text-transform:uppercase;letter-spacing:.6px;
+        padding:6px 8px 2px;font-weight:700}
+  .ssel-opt{padding:6px 8px;border-radius:6px;font-size:12.5px;color:var(--ink);font-weight:600;cursor:pointer}
+  .ssel-opt:hover{background:rgba(13,148,136,.16)}
+  .ssel-opt.sel{color:var(--accent2);font-weight:700;background:rgba(13,148,136,.08)}
+  .ssel-empty{padding:8px;font-size:11.5px;color:var(--mut)}
   .chips{display:flex;gap:6px}
   .chip{flex:1;text-align:center;padding:7px 0;border:1px solid var(--line);border-radius:9px;
         font-size:11.5px;cursor:pointer;color:var(--mut);background:rgba(255,255,255,.4);user-select:none}
@@ -164,9 +297,17 @@
   .chip[data-s="moving"].on{background:var(--moving)}
   .chip[data-s="still"].on{background:var(--still)}
   .chip[data-s="all"].on{background:var(--accent)}
+  .mode-toggle{width:auto;flex:0 0 auto}
+  .mode-toggle .chip{flex:0 0 auto;padding:7px 14px}
+  .mode-toggle .chip[data-mode="roster"].on{background:linear-gradient(155deg,var(--accent),var(--accent2))}
+  .mode-toggle .chip[data-mode="full"].on{background:var(--mut)}
   .reset{background:rgba(255,255,255,.4);border:1px solid var(--line);color:var(--mut);border-radius:9px;
          padding:7px;font-size:12px;cursor:pointer}
   .reset:hover{color:var(--ink);border-color:var(--accent)}
+  .accent-btn{background:linear-gradient(155deg,var(--accent),var(--accent2));color:#eefdf8;
+        border-color:transparent;font-weight:700}
+  .accent-btn:hover{color:#eefdf8;filter:brightness(1.06)}
+  .accent-btn:disabled{opacity:.6;cursor:default;filter:none}
   .filter-summary{font-size:11px;color:var(--mut);line-height:1.5;padding:8px 10px;
                   border:1px solid var(--line);border-radius:9px;background:rgba(255,255,255,.4)}
   .pill{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;
@@ -216,8 +357,16 @@
       <div class="mark">LW</div>
       <div class="txt"><b>LWMC Fleet Console</b><span>Lahore Division · live vehicle tracking</span></div>
     </div>
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="topSearch" placeholder="Search vehicle, staff name, or role (e.g. AM Yard)…">
+    </div>
     <div class="snap" id="snap"><span class="dot-live"></span>—</div>
-    <div class="legend">
+    <div class="chips mode-toggle" id="modeToggle">
+      <div class="chip on" data-mode="full">Full fleet</div>
+      <div class="chip" data-mode="roster">Roster-scoped</div>
+    </div>
+    <div class="topbar-spacer legend">
       <span><i style="background:var(--moving)"></i>Moving</span>
       <span><i style="background:var(--still)"></i>Still / parked</span>
       <span><i style="background:var(--accent);border-radius:2px"></i>UC boundary</span>
@@ -226,12 +375,26 @@
 
   <div class="mid">
     <aside class="side">
+      <div class="sect">Menu</div>
+      <div class="navlist" id="navList">
+        <div class="navlink active" data-target="secOverview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Overview</div>
+        <div class="navlink" data-target="secAnalytics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>Analytics</div>
+        <div class="navlink" data-target="secMap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z"/><path d="M9 4v13M15 7v13"/></svg>Map</div>
+        <div class="navlink" data-target="secReports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>Reports</div>
+        <div class="navlink" data-target="secTable"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>Fleet table</div>
+      </div>
+
       <div class="kpis" id="kpis"></div>
 
       <div class="sect">Date</div>
       <div class="date-block" id="dateBlock"></div>
 
-      <div class="sect">Districts</div>
+      <div class="sect" id="empSect">Employee</div>
+      <div class="filter-group" id="empGroup">
+        <select id="empSel"><option value="">All staff / vehicles</option></select>
+      </div>
+
+      <div class="sect">Towns</div>
       <div class="rail" id="rail"></div>
 
       <div class="sect">Filters</div>
@@ -278,30 +441,53 @@
           <select id="ucSel"><option value="">All UCs</option></select>
         </div>
         <div class="filter-group">
+          <div class="filter-label">Zone</div>
+          <select id="zoneSel"><option value="">All zones</option></select>
+        </div>
+        <div class="filter-group">
           <div class="filter-label">Vehicle type</div>
           <select id="typeSel"><option value="">All vehicle types</option></select>
         </div>
         <div class="filter-group">
           <div class="filter-label">Search</div>
-          <input id="search" placeholder="Search vehicle no…">
+          <input id="search" placeholder="Search vehicle, staff name, or role (e.g. AM Yard)…">
         </div>
         <div class="filter-summary" id="filterSummary">Use recency, connectivity, and UC filters to narrow the fleet.</div>
         <button class="reset" id="reset">Reset filters</button>
       </div>
 
+      <div class="sect">Anomalies</div>
+      <div class="filt">
+        <div class="anomaly-list" id="anomalyList"></div>
+        <div class="filter-group">
+          <div class="filter-label">Anomaly type</div>
+          <select id="anomalySel"><option value="">All vehicles (no anomaly filter)</option></select>
+        </div>
+      </div>
+
       <div class="sect">Coverage note</div>
-      <div class="note">UC boundaries exist for Lahore city only. Kasur, Sheikhupura &amp; Nankana Sahib
-        vehicles are shown in written form here; use the UC filter to separate city-bound fleet from outside points.</div>
+      <div class="note" id="coverageNote">Scope is Lahore city only — 285 UC polygons across 9 towns. Vehicles with GPS outside every
+        UC polygon still show up in the fleet (use the UC filter's "Outside UC" option to isolate them).</div>
+
+      <div class="nav-card" id="navCard" title="Score = 40% moving + 40% online + 20% battery OK, out of 100, from the vehicles currently in view">
+        <b>Fleet health</b>
+        <span id="navCardBody">—</span>
+      </div>
     </aside>
 
     <main class="content">
-      <section class="panel">
-        <div class="panel-head">
-          <b>Map</b>
-          <span>coverage, markers, and popups</span>
+      <div class="page-head" id="secOverview">
+        <div>
+          <h1>Fleet Overview</h1>
+          <p id="pageSub">Live snapshot and performance across the LWMC fleet</p>
         </div>
-        <div id="map"></div>
-      </section>
+        <div class="page-actions">
+          <button class="reset" id="genReportHeader">Generate report</button>
+          <button class="reset accent-btn" id="xlsxReportHeader">Export Excel</button>
+        </div>
+      </div>
+
+      <div class="stat-row" id="statRow"></div>
 
       <section class="panel">
         <div class="panel-head">
@@ -311,25 +497,81 @@
         <div class="card-grid" id="overviewCards"></div>
       </section>
 
-      <section class="panel">
+      <section id="secAnalytics">
+        <div class="analytics-grid">
+          <div class="chart-card">
+            <div class="ch-head">
+              <b>Fleet activity by town</b>
+              <div class="chart-legend">
+                <span><i style="background:var(--moving)"></i>Moving</span>
+                <span><i style="background:var(--still)"></i>Still</span>
+                <span><i style="background:#3b6fd6"></i>Distance</span>
+              </div>
+            </div>
+            <div id="comboChart"></div>
+          </div>
+          <div class="chart-card">
+            <div class="ch-head"><b>Connectivity</b></div>
+            <div id="connDonut"></div>
+          </div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="analytics-grid" style="grid-template-columns:1fr 1fr 1.2fr">
+          <div class="chart-card">
+            <div class="ch-head"><b>Recency funnel</b></div>
+            <div id="recencyFunnel"></div>
+          </div>
+          <div class="chart-card">
+            <div class="ch-head"><b>Status mix</b></div>
+            <div id="statusDonut"></div>
+          </div>
+          <div class="chart-card">
+            <div class="ch-head"><b id="lbTitle">Top towns by distance</b></div>
+            <div class="leaderboard" id="leaderboard"></div>
+          </div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="analytics-grid" style="grid-template-columns:1.5fr 1fr">
+          <div class="chart-card">
+            <div class="ch-head">
+              <b>Town fleet: target vs. deployed</b>
+              <div class="chart-legend">
+                <span><i style="background:var(--well);border:1px solid var(--line)"></i>Target</span>
+                <span><i style="background:var(--accent)"></i>LR deployed</span>
+                <span><i style="background:#3b6fd6"></i>Full fleet deployed</span>
+              </div>
+            </div>
+            <div id="townTargets"></div>
+            <div class="note" style="margin-top:8px">Targets come from the LWMC fleet establishment registry (Lahore Fleet+LRs.xlsx), matched to live vehicles by Vehicle ID — this covers ~96% of the live fleet, far more reliably than VTMS's own vehicle type field (blank on most rows). Each town shows two separate comparisons: Loader Rickshaw target vs. LR deployed, and full-fleet target (every registered category) vs. full-fleet deployed.</div>
+          </div>
+          <div class="chart-card">
+            <div class="ch-head"><b>In assigned area</b></div>
+            <div id="assignedDonut"></div>
+            <div class="note" style="margin-top:8px" id="assignedNote"></div>
+          </div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="analytics-grid" style="grid-template-columns:1fr 1.4fr">
+          <div class="chart-card">
+            <div class="ch-head"><b>Top zones by distance</b></div>
+            <div class="leaderboard" id="zoneBoard"></div>
+          </div>
+          <div class="chart-card">
+            <div class="ch-head"><b>Working hours distribution by town</b></div>
+            <div id="hoursTable" style="overflow-x:auto"></div>
+            <div class="note" style="margin-top:8px">Idea borrowed from the Agency Wise Fleet Analysis workbook's Division-wise hours-worked breakdown, applied here at Town level. Buckets are today's working time per vehicle, not a target.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="secMap">
         <div class="panel-head">
-          <b>Charts</b>
-          <span>text-first charts built from the current filtered fleet</span>
+          <b>Map</b>
+          <span>coverage, markers, and popups</span>
         </div>
-        <div class="two-col">
-          <div class="chart-block">
-            <div class="filter-label">Status mix</div>
-            <div id="statusChart"></div>
-          </div>
-          <div class="chart-block">
-            <div class="filter-label">Recency buckets</div>
-            <div id="recencyChart"></div>
-          </div>
-        </div>
-        <div style="height:10px"></div>
-        <div class="chart-block">
-          <div class="filter-label">District distribution</div>
-          <div id="districtChart"></div>
+        <div class="map-wrap">
+          <div id="map"></div>
+          <div class="map-badge" id="mapBadge" style="display:none"></div>
         </div>
       </section>
     </main>
@@ -341,6 +583,7 @@
           <span>composite score</span>
         </div>
         <div class="health" id="health"></div>
+        <div class="note" style="margin-top:8px">Score = 40% moving + 40% online + 20% battery OK (weighted, out of 100), computed from the vehicles currently in view. 75+ is "operating well", 50-74 is "needs attention", below 50 is "at risk".</div>
       </section>
 
       <section class="panel">
@@ -351,7 +594,7 @@
         <div class="alert-list" id="predictionList"></div>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="secReports">
         <div class="panel-head">
           <b>Output report</b>
           <span id="reportMeta">written summary of the current view</span>
@@ -361,6 +604,9 @@
           <button class="reset" id="dlReport" style="flex:1">Download .txt</button>
         </div>
         <pre class="report-box" id="reportBox">Click "Generate report" to compile a written report from the vehicles currently in view (respects all filters above).</pre>
+        <div class="note" style="margin-top:10px">Excel workbook: Summary · By Town · By Office · By Vehicle Type · By UC · By Zone · Working Hours · By Employee · Town Targets · Watchlist · Vehicle Detail — all built from the vehicles currently in view.</div>
+        <button class="reset accent-btn" id="xlsxReport" style="width:100%;margin-top:8px">Export analytical report (.xlsx)</button>
+        <div class="note" id="xlsxStatus" style="margin-top:6px"></div>
       </section>
 
       <section class="panel" style="flex:1;min-height:260px;display:flex;flex-direction:column">
@@ -373,7 +619,7 @@
     </aside>
   </div>
 
-  <div class="bottom">
+  <div class="bottom" id="secTable">
     <div class="thead">
       <b>Fleet</b><span class="cnt" id="tcount">0</span>
       <span class="hint">click a row to open the written record below · click a header to sort</span>
@@ -389,19 +635,32 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script>
 const DATA = /*DATA*/;
 </script>
 <script>
+let DASHBOARD_BRIDGE = null;
+if (typeof qt !== 'undefined' && qt.webChannelTransport && typeof QWebChannel !== 'undefined') {
+  new QWebChannel(qt.webChannelTransport, channel => {
+    DASHBOARD_BRIDGE = channel.objects.dashboardBridge || null;
+    window.dashboardBridge = DASHBOARD_BRIDGE;
+  });
+}
 const STATUS_COLOR = {moving:'#16a34a', still:'#d97706', idle:'#2563eb'};
-const DISTRICT_ORDER = ['Lahore','Kasur','Sheikhupura','Nankana Sahib'];
+const TOWN_ORDER = ['Allama Iqbal Town','Aziz Bhatti Town','DGBT','Gulberg Town','Nishter Town',
+  'Ravi Town','Samnabad Town','Shalimar Town','Wagha Town'];
+const TOWN_CODE = {'Allama Iqbal Town':'AIT','Aziz Bhatti Town':'ABT','DGBT':'DGB','Gulberg Town':'GLB',
+  'Nishter Town':'NIS','Ravi Town':'RAV','Samnabad Town':'SAM','Shalimar Town':'SHL','Wagha Town':'WAG'};
 const RAW_FIELD_LABELS = {
   vehicle_id:'Vehicle ID', vehicle:'Vehicle', vkey:'Vehicle key', district:'District',
   office:'Office', tehsil_code:'Tehsil code', vehicle_type:'Vehicle type', used_for:'Used for',
   status:'Status', engine:'Engine', distance_km:'Distance (km)', working_min:'Working (min)',
   lat:'Latitude', lon:'Longitude', timestamp:'Timestamp', last_received:'Last received',
   reporting_status:'Reporting status', status_text:'Status text', battery_volt:'Battery (V)',
-  tracker_offline:'Tracker offline', uc:'UC', uc_town:'UC town', uc_zone:'UC zone', snapshot:'Snapshot date',
+  tracker_offline:'Tracker offline', uc:'UC', uc_town:'UC town', uc_zone:'UC zone',
+  registry_category:'Registry category', assigned_town:'Assigned (home) town',
+  in_assigned_area:'Currently in assigned area', snapshot:'Snapshot date',
 };
 function rawValue(v){
   if(v===null||v===undefined||v==='') return '\u2014';
@@ -420,8 +679,9 @@ function rawRecordTableHtml(p){
 function rawRecordDetailHtml(p){
   return rawRecordPairs(p).map(([k,v])=>`<div class="detail-line"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
 }
-let state = {district:null, status:'all', recent:'all', conn:'all', uc:'', type:'', q:'',
-  date:'', timeFrom:'', timeTo:'', sort:'distance_km', dir:-1, selected:null};
+let state = {town:null, status:'all', recent:'all', conn:'all', uc:'', zone:'', type:'', q:'',
+  date:'', timeFrom:'', timeTo:'', sort:'distance_km', dir:-1, selected:null,
+  rosterScoped:false, employee:'', anomaly:''};
 function parseLastReceived(value){
   if(!value || value==='-') return null;
   const m = String(value).trim().match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{1,2}):(\d{2}) (AM|PM)$/);
@@ -438,6 +698,28 @@ const referenceTime = POINTS.reduce((acc, p) => p.last_received_ts && (!acc || p
 const ucOptions = [...new Map(POINTS.filter(p => p.uc).map(p => [p.uc, p])).values()]
   .sort((a,b) => a.uc.localeCompare(b.uc, undefined, {numeric:true}))
   .map(p => ({value: p.uc, label: `${p.uc} · ${p.uc_town || p.district}`}));
+
+// Zone dimension: built from lahore_ucs.geojson (the KML-derived source of
+// truth for zone/UC/town boundaries), same data the map's UC layer uses --
+// not from vehicle points, so a zone with zero vehicles currently in it
+// still appears in the dropdown.
+const ZONE_TO_UCS = {};
+const ZONE_TOWN = {};
+(DATA.ucs.features||[]).forEach(f=>{
+  const z = f.properties.zone, t = f.properties.town, uc = f.properties.uc;
+  if(!z) return;
+  if(!ZONE_TO_UCS[z]) ZONE_TO_UCS[z] = new Set();
+  ZONE_TO_UCS[z].add(uc);
+  ZONE_TOWN[z] = t;
+});
+function zoneSortKey(z){ const m = /Zone-(\d+)/.exec(z); return m ? +m[1] : 0; }
+const zoneOptions = Object.keys(ZONE_TO_UCS).sort((a,b)=>zoneSortKey(a)-zoneSortKey(b))
+  .map(z => ({value:z, label:`${z} · ${ZONE_TOWN[z]} (${ZONE_TO_UCS[z].size} UC${ZONE_TO_UCS[z].size===1?'':'s'})`}));
+const EMPLOYEES = (DATA.employees || []).map(e => ({...e, uc_set: new Set(e.resolved_ucs)}));
+const EMPLOYEE_BY_ID = new Map(EMPLOYEES.map(e => [e.id, e]));
+const ROSTER_UC_SET = new Set(DATA.roster_ucs || []);
+const ROLE_LABEL = {TM:'Tehsil Manager', FM:'Fleet Manager', ZO:'Zonal Officer', AM_YARD:'AM Yard', MVI:'MVI'};
+const ROLE_ORDER = ['TM','FM','ZO','AM_YARD','MVI'];
 function ageHours(p){
   if(!p.last_received_ts) return Infinity;
   return (referenceTime - p.last_received_ts) / 36e5;
@@ -455,13 +737,74 @@ function ageLabel(p){
   return `${h.toFixed(h < 10 ? 1 : 0)} h ago`;
 }
 
+// ---- anomalies: shared definitions so the sidebar filter, the written
+// report, and the Excel Watchlist sheet all agree on what counts as one ----
+const ANOMALY_TYPES = [
+  {key:'no_registry', label:'Not matched to fleet registry', test:p=>!p.registry_category},
+  {key:'no_uc', label:'No UC assigned (outside polygons)', test:p=>!p.uc},
+  {key:'outside_area', label:'Outside assigned area', test:p=>p.in_assigned_area===false},
+  {key:'battery', label:'Battery under 2V', test:p=>p.battery_volt!=null && p.battery_volt<2},
+  {key:'tracker_offline', label:'Tracker offline flag', test:p=>!!p.tracker_offline},
+  {key:'not_reporting', label:'Not reporting', test:p=>p.reporting_status==='Not Reporting'},
+  {key:'stale', label:'Stale, no update in 8h+', test:p=>ageHours(p)>8},
+];
+function vehicleAnomalies(p){
+  return ANOMALY_TYPES.filter(a=>a.test(p));
+}
+
+// Working-hours distribution: idea borrowed from the org's own "Agency Wise
+// Fleet Analysis" workbook (a province-wide Division-by-hours-worked-bucket
+// table) -- same shape, applied at our Town granularity since that's the
+// closest equivalent to their "Division" here.
+const WORK_BUCKETS = [
+  {key:'lt2',  label:'Below 2h', test:m=>m<120},
+  {key:'2to4', label:'2-4h',     test:m=>m>=120 && m<240},
+  {key:'4to6', label:'4-6h',     test:m=>m>=240 && m<360},
+  {key:'6to8', label:'6-8h',     test:m=>m>=360 && m<480},
+  {key:'gt8',  label:'Above 8h', test:m=>m>=480},
+];
+function buildHoursTable(rows){
+  const withHours = rows.filter(p=>p.working_min!=null);
+  const byTown = TOWN_ORDER.map(t=>{
+    const g = withHours.filter(p=>p.uc_town===t);
+    const counts = WORK_BUCKETS.map(b=>g.filter(p=>b.test(p.working_min)).length);
+    const total = g.length;
+    const below4 = counts[0]+counts[1];
+    const below6 = below4+counts[2];
+    return {town:t, counts, total,
+      pctBelow4: total ? Math.round(100*below4/total) : null,
+      pctBelow6: total ? Math.round(100*below6/total) : null};
+  }).filter(r=>r.total>0);
+  const totalsCounts = WORK_BUCKETS.map((b,i)=>byTown.reduce((s,r)=>s+r.counts[i],0));
+  const totalAll = byTown.reduce((s,r)=>s+r.total,0);
+  const totalBelow4 = totalsCounts[0]+totalsCounts[1];
+  const totalBelow6 = totalBelow4+totalsCounts[2];
+  const totals = {town:'All towns', counts:totalsCounts, total:totalAll,
+    pctBelow4: totalAll ? Math.round(100*totalBelow4/totalAll) : null,
+    pctBelow6: totalAll ? Math.round(100*totalBelow6/totalAll) : null};
+  return {rows:byTown, totals, excluded: rows.length - withHours.length};
+}
+
 document.getElementById('snap').innerHTML = '<span class="dot-live"></span>Snapshot ' + DATA.snapshot;
 document.getElementById('ucSel').innerHTML = '<option value="">All UCs</option><option value="outside">Outside UC</option>' +
   ucOptions.map(u => `<option value="${u.value}">${u.label}</option>`).join('');
+document.getElementById('zoneSel').innerHTML = '<option value="">All zones</option>' +
+  zoneOptions.map(z => `<option value="${z.value}">${z.label}</option>`).join('');
 const dateOptions = [...new Set(POINTS.map(p=>p.snapshot).filter(Boolean))].sort();
 document.getElementById('dateSel').innerHTML = '<option value="">All dates</option>' +
   dateOptions.map(d => `<option value="${d}">${d}</option>`).join('');
 if(dateOptions.length === 1){ state.date = dateOptions[0]; document.getElementById('dateSel').value = dateOptions[0]; }
+document.getElementById('empSel').innerHTML = '<option value="">All staff / vehicles</option>' +
+  ROLE_ORDER.filter(r => EMPLOYEES.some(e => e.role === r)).map(role => {
+    const opts = EMPLOYEES.filter(e => e.role === role).map(e => {
+      const covLabel = e.resolved_ucs.length ? `${e.resolved_ucs.length} UC${e.resolved_ucs.length===1?'':'s'}` : 'unresolved area';
+      const shiftLabel = e.shift ? `${e.shift} · ` : '';
+      return `<option value="${e.id}">${e.name} · ${shiftLabel}${covLabel}</option>`;
+    }).join('');
+    return `<optgroup label="${ROLE_LABEL[role]}">${opts}</optgroup>`;
+  }).join('');
+document.getElementById('anomalySel').innerHTML = '<option value="">All vehicles (no anomaly filter)</option>' +
+  ANOMALY_TYPES.map(a => `<option value="${a.key}">${a.label}</option>`).join('');
 
 // ---- map ----
 const map = L.map('map',{preferCanvas:true, zoomControl:true}).setView([31.52,74.06],9);
@@ -469,15 +812,54 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
   {attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:19}).addTo(map);
 
 // UC polygons
+const UC_COLOR_DEFAULT = '#0d9488';
+const UC_STYLE_BASE = {color:UC_COLOR_DEFAULT, fillColor:UC_COLOR_DEFAULT, weight:1.2, opacity:.35, fillOpacity:.04};
+const UC_STYLE_HOVER = {opacity:.8, fillOpacity:.12};
+// Distinct violet (not used by any status/base color) so a selected
+// zone/UC/employee's area reads as clearly different from the rest of the map.
+const UC_STYLE_HI = {color:'#7c3aed', fillColor:'#7c3aed', opacity:.9, weight:2.4, fillOpacity:.24};
+function ucRestStyle(l){ return l._hi ? UC_STYLE_HI : UC_STYLE_BASE; }
 const ucLayer = L.geoJSON(DATA.ucs,{
   style:{color:'#0d9488', weight:1.2, opacity:.55, fillColor:'#0d9488', fillOpacity:.06},
   onEachFeature:(f,l)=>{
     const s = DATA.uc_stats[f.properties.uc] || {vehicles:0,moving:0,dist:0};
     l.bindTooltip(`<b>${f.properties.uc}</b> · ${f.properties.town}<br>${s.vehicles} vehicles · ${s.moving} moving`,{sticky:true});
-    l.on('mouseover',()=>l.setStyle({opacity:.8,fillOpacity:.12}));
-    l.on('mouseout',()=>l.setStyle({opacity:.35,fillOpacity:.04}));
+    l.on('mouseover',()=>l.setStyle(UC_STYLE_HOVER));
+    l.on('mouseout',()=>l.setStyle(ucRestStyle(l)));
   }
 }).addTo(map);
+
+// A handful of UCs get a permanent name label on the map (instead of only
+// on hover) whenever a Zone/UC/Employee filter narrows the view down to a
+// specific, small set -- with 274 UCs city-wide, always-on labels would
+// just be noise, so this only kicks in once something has scoped the view.
+function highlightedUcSet(){
+  if(state.zone) return ZONE_TO_UCS[state.zone] || new Set();
+  if(state.employee){
+    const emp = EMPLOYEE_BY_ID.get(state.employee);
+    if(emp && emp.uc_set.size) return emp.uc_set;
+  }
+  if(state.uc && state.uc !== 'outside') return new Set([state.uc]);
+  return null;
+}
+function updateUcLabels(){
+  const hi = highlightedUcSet();
+  ucLayer.eachLayer(l=>{
+    const props = l.feature && l.feature.properties;
+    if(!props) return;
+    const isHi = !!(hi && hi.has(props.uc));
+    if(isHi === !!l._hi) return;
+    l._hi = isHi;
+    l.unbindTooltip();
+    if(isHi){
+      l.bindTooltip(props.uc, {permanent:true, direction:'center', className:'uc-label', opacity:0.9});
+    } else {
+      const s = DATA.uc_stats[props.uc] || {vehicles:0,moving:0,dist:0};
+      l.bindTooltip(`<b>${props.uc}</b> · ${props.town}<br>${s.vehicles} vehicles · ${s.moving} moving`,{sticky:true});
+    }
+    l.setStyle(ucRestStyle(l));
+  });
+}
 
 const markerLayer = L.layerGroup().addTo(map);
 
@@ -487,9 +869,8 @@ function popupHtml(p){
   const conn = isOnline(p) ? 'Online' : 'Offline';
   const connClass = isOnline(p) ? 'ok' : 'off';
   const rows = [
-    ['District', p.district],
     ['UC / Town', p.uc ? `${p.uc} · ${p.uc_town}` : '—'],
-    ['Type', p.vehicle_type||'—'],
+    ['Type', p.vehicle_type || (p.registry_category ? `${p.registry_category} (registry)` : '—')],
     ['Used for', p.used_for||'—'],
     ['Status', p.status],
     ['Engine', p.engine],
@@ -501,7 +882,7 @@ function popupHtml(p){
     ['Reporting', p.reporting_status||'—'],
     ['Last received', p.last_received||'—'],
   ];
-  return `<div class="pop"><div class="pophead"><b>${p.vehicle}</b><span class="pill ${connClass}">${conn}</span></div><div class="popmeta">${p.district} · ${p.vehicle_type||'—'} · ${ageLabel(p)}</div><table>`+
+  return `<div class="pop"><div class="pophead"><b>${p.vehicle}</b><span class="pill ${connClass}">${conn}</span></div><div class="popmeta">${p.uc_town||'Outside UC'} · ${p.vehicle_type||'—'} · ${ageLabel(p)}</div><table>`+
     rows.map(r=>`<tr><td>${r[0]}</td><td class="v">${r[1]}</td></tr>`).join('')+`</table>`+
     `<details style="margin-top:6px"><summary style="cursor:pointer;color:var(--mut);font-size:11px">Raw record (all fields)</summary><table>`+rawRecordTableHtml(p)+`</table></details></div>`;
 }
@@ -516,10 +897,21 @@ function toMinutes(hhmm){
   const [h,m] = hhmm.split(':').map(Number);
   return h*60+m;
 }
-function filtered(){
+function searchMatchedUcs(q){
+  // lets the search box match employee names and roles ("AM Yard", "TM"...)
+  // in addition to vehicle numbers -- typing a person or role filters to
+  // every UC they/their group covers, works in any mode (not just roster-scoped).
+  const matched = new Set();
+  matchingEmployees(q).forEach(e=>e.resolved_ucs.forEach(uc=>matched.add(uc)));
+  return matched;
+}
+function filtered(opts){
+  opts = opts || {};
   const from = toMinutes(state.timeFrom), to = toMinutes(state.timeTo);
+  const searchUcs = state.q ? searchMatchedUcs(state.q) : null;
+  const anomalyDef = (!opts.skipAnomaly && state.anomaly) ? ANOMALY_TYPES.find(a=>a.key===state.anomaly) : null;
   return POINTS.filter(p=>{
-    if(state.district && p.district!==state.district) return false;
+    if(state.town && p.uc_town!==state.town) return false;
     if(state.status!=='all' && p.status!==state.status) return false;
     if(state.recent!=='all' && ageHours(p) > +state.recent) return false;
     if(state.conn==='online' && !isOnline(p)) return false;
@@ -535,8 +927,21 @@ function filtered(){
       if(state.uc === 'outside'){ if(p.uc) return false; }
       else if(p.uc !== state.uc) return false;
     }
+    if(state.zone && p.uc_zone !== state.zone) return false;
+    if(state.rosterScoped){
+      if(!p.uc || !ROSTER_UC_SET.has(p.uc)) return false;
+    }
+    if(state.employee){
+      const emp = EMPLOYEE_BY_ID.get(state.employee);
+      if(!emp || !p.uc || !emp.uc_set.has(p.uc)) return false;
+    }
     if(state.type && p.vehicle_type!==state.type) return false;
-    if(state.q && !(p.vehicle||'').toLowerCase().includes(state.q)) return false;
+    if(state.q){
+      const vehicleMatch = (p.vehicle||'').toLowerCase().includes(state.q);
+      const employeeMatch = searchUcs && searchUcs.size && p.uc && searchUcs.has(p.uc);
+      if(!vehicleMatch && !employeeMatch) return false;
+    }
+    if(anomalyDef && !anomalyDef.test(p)) return false;
     return true;
   });
 }
@@ -553,10 +958,42 @@ function drawMarkers(rows){
     markerLayer.addLayer(m);
   });
 }
+function matchingEmployees(q){
+  return EMPLOYEES.filter(e=>{
+    const roleLabel = (ROLE_LABEL[e.role]||e.role).toLowerCase();
+    return e.name.toLowerCase().includes(q) || roleLabel.includes(q) || e.role.toLowerCase().includes(q);
+  });
+}
+function updateMapBadge(rows){
+  const badge = document.getElementById('mapBadge');
+  let title = null, sub = '';
+  if(state.employee){
+    const emp = EMPLOYEE_BY_ID.get(state.employee);
+    if(emp){
+      title = `${emp.name} — ${ROLE_LABEL[emp.role]||emp.role}`;
+      sub = emp.resolved_ucs.length ? `${emp.resolved_ucs.length} UC${emp.resolved_ucs.length===1?'':'s'} · ${fmt(rows.length)} vehicles shown` : 'unresolved area';
+    }
+  } else if(state.q){
+    const matches = matchingEmployees(state.q);
+    if(matches.length === 1){
+      title = `${matches[0].name} — ${ROLE_LABEL[matches[0].role]||matches[0].role}`;
+      sub = `matched by search · ${fmt(rows.length)} vehicles shown`;
+    } else if(matches.length > 1){
+      title = `${fmt(matches.length)} staff matched "${state.q}"`;
+      sub = matches.slice(0,4).map(e=>e.name).join(', ') + (matches.length>4 ? ', …' : '');
+    }
+  }
+  if(title){
+    badge.innerHTML = `${title}<span>${sub}</span>`;
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+}
 
 // ---- table ----
 const COLS = [
-  ['vehicle','Vehicle'],['district','District'],['vehicle_type','Type'],
+  ['vehicle','Vehicle'],['uc_town','Town'],['vehicle_type','Type'],
   ['status','Status'],['distance_km','Dist (km)'],['working_min','Work (min)'],
   ['uc','UC'],['battery_volt','Batt V'],['last_received','Last seen']
 ];
@@ -582,7 +1019,7 @@ function drawTable(rows){
   document.getElementById('tbody').innerHTML = s.map(p=>`
     <tr data-v="${p.vehicle}">
       <td>${p.vehicle}</td>
-      <td><span class="tag">${p.district}</span></td>
+      <td><span class="tag">${p.uc_town||'—'}</span></td>
       <td>${p.vehicle_type||'—'}</td>
       <td><span class="dot" style="background:${STATUS_COLOR[p.status]||'#16a34a'}"></span>${p.status}</td>
       <td class="num">${fmt(p.distance_km,2)}</td>
@@ -637,49 +1074,263 @@ function drawOverview(rows){
     <div class="mini-card"><div class="n">${value}</div><div class="l">${label}</div><div class="s">${sub}</div></div>
   `).join('');
 }
-function drawBars(targetId, rows){
-  document.getElementById(targetId).innerHTML = rows.map(r => {
-    const width = Math.max(4, Math.min(100, r.pct));
-    return `<div class="chart-row">
-      <div class="chart-label">${r.label}</div>
-      <div class="chart-bar"><div class="chart-fill ${r.kind || ''}" style="width:${width}%"></div></div>
-      <div class="chart-value">${r.value}</div>
+function sparkline(vals, color){
+  const max = Math.max(1, ...vals);
+  const n = vals.length;
+  const pts = vals.map((v,i)=>`${n>1 ? i*(100/(n-1)) : 50},${24-(v/max)*22}`).join(' ');
+  return `<svg viewBox="0 0 100 24" width="70" height="22"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+function barSpark(vals, color){
+  const max = Math.max(1, ...vals);
+  return `<svg viewBox="0 0 60 24" width="58" height="22">` + vals.map((v,i)=>{
+    const h = Math.max(2, (v/max)*22), x = i*9;
+    return `<rect x="${x}" y="${24-h}" width="6" height="${h}" fill="${color}" rx="1.5"/>`;
+  }).join('') + `</svg>`;
+}
+function miniRing(pct, color){
+  return `<div style="width:34px;height:34px;border-radius:50%;background:conic-gradient(${color} ${pct*3.6}deg, rgba(255,255,255,.28) ${pct*3.6}deg)"></div>`;
+}
+function drawStatCards(rows){
+  const total = rows.length || 1;
+  const moving = rows.filter(p=>p.status==='moving').length;
+  const dist = rows.reduce((s,p)=>s+(p.distance_km||0),0);
+  const online = rows.filter(p=>isOnline(p)).length;
+  const movingPct = Math.round(100*moving/total);
+  const onlinePct = Math.round(100*online/total);
+  const battOk = 1 - (rows.filter(p=>p.battery_volt!=null && p.battery_volt<2).length/total);
+  const score = Math.round(movingPct*0.4 + onlinePct*0.4 + battOk*100*0.2);
+  const townCounts = TOWN_ORDER.map(t=>rows.filter(p=>p.uc_town===t).length);
+  const townDist = TOWN_ORDER.map(t=>rows.reduce((s,p)=>p.uc_town===t?s+(p.distance_km||0):s,0));
+  document.getElementById('statRow').innerHTML = `
+    <div class="stat-card c1">
+      <div class="stat-top"><div><div class="stat-label">Total vehicles</div><div class="stat-n">${fmt(rows.length)}</div></div></div>
+      <div class="stat-sub">${fmt(moving)} moving now</div>
+      <div class="mini-viz">${sparkline(townCounts,'#eefdf8')}</div>
+    </div>
+    <div class="stat-card c2">
+      <div class="stat-top"><div><div class="stat-label">Moving</div><div class="stat-n">${movingPct}%</div></div></div>
+      <div class="stat-sub">${fmt(moving)} of ${fmt(rows.length)} vehicles</div>
+      <div class="mini-viz">${miniRing(movingPct,'#eefdf8')}</div>
+    </div>
+    <div class="stat-card c3">
+      <div class="stat-top"><div><div class="stat-label">Fleet health</div><div class="stat-n">${score}</div></div></div>
+      <div class="stat-sub">${onlinePct}% online · composite /100</div>
+      <div class="mini-viz">${miniRing(score,'#eefdf8')}</div>
+    </div>
+    <div class="stat-card c4">
+      <div class="stat-top"><div><div class="stat-label">Total distance</div><div class="stat-n">${fmt(Math.round(dist))}</div></div></div>
+      <div class="stat-sub">kilometres, current view</div>
+      <div class="mini-viz">${barSpark(townDist,'#eefdf8')}</div>
+    </div>`;
+  document.getElementById('navCardBody').textContent =
+    `${score}/100 composite — ${movingPct}% moving, ${onlinePct}% online across ${fmt(rows.length)} vehicles in view.`;
+}
+function drawComboChart(rows){
+  const data = TOWN_ORDER.map(t=>{
+    const r = rows.filter(p=>p.uc_town===t);
+    return {d:t, moving:r.filter(p=>p.status==='moving').length, still:r.filter(p=>p.status==='still').length,
+      dist: r.reduce((s,p)=>s+(p.distance_km||0),0)};
+  });
+  const W=560,H=220,padL=34,padR=16,padT=14,padB=26,plotW=W-padL-padR,plotH=H-padT-padB,n=data.length,bw=plotW/n*0.42;
+  const maxCount = Math.max(1, ...data.map(x=>x.moving+x.still));
+  const maxDist = Math.max(1, ...data.map(x=>x.dist));
+  const xC = i => padL + plotW*(i+0.5)/n;
+  const yDist = v => padT + plotH*(1 - v/maxDist);
+  let bars='', labels='';
+  data.forEach((x,i)=>{
+    const cx = xC(i);
+    const stillH = plotH*(x.still/maxCount), movingH = plotH*(x.moving/maxCount);
+    const yStillTop = padT+plotH-stillH-movingH, yMovingTop = padT+plotH-movingH;
+    bars += `<rect x="${cx-bw/2}" y="${yStillTop}" width="${bw}" height="${Math.max(0,stillH)}" fill="var(--still)" rx="2"/>`;
+    bars += `<rect x="${cx-bw/2}" y="${yMovingTop}" width="${bw}" height="${Math.max(0,movingH)}" fill="var(--moving)" rx="2"/>`;
+    labels += `<text x="${cx}" y="${H-8}" text-anchor="middle" font-size="9.5" fill="var(--mut)">${TOWN_CODE[x.d]||x.d}</text>`;
+  });
+  const pts = data.map((x,i)=>`${xC(i)},${yDist(x.dist)}`).join(' ');
+  const dots = data.map((x,i)=>`<circle cx="${xC(i)}" cy="${yDist(x.dist)}" r="3.5" fill="#3b6fd6"/>`).join('');
+  document.getElementById('comboChart').innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:220px;overflow:visible">` +
+    bars + `<polyline points="${pts}" fill="none" stroke="#3b6fd6" stroke-width="2.5"/>` + dots + labels + `</svg>`;
+}
+function renderDonut(containerId, segments, holeLabel, holeValue){
+  const total = segments.reduce((s,x)=>s+x.value,0) || 1;
+  let acc = 0;
+  const stops = segments.map(s=>{
+    const start = acc/total*360; acc += s.value; const end = acc/total*360;
+    return `${s.color} ${start}deg ${end}deg`;
+  }).join(', ');
+  const legend = segments.map(s=>`<div class="row"><span class="k"><i style="background:${s.color}"></i>${s.label}</span><span class="v">${fmt(s.value)} (${Math.round(100*s.value/total)}%)</span></div>`).join('');
+  document.getElementById(containerId).innerHTML = `<div class="donut-wrap">
+    <div class="donut" style="background:conic-gradient(${stops})"><div class="hole"><b>${holeValue}</b><span>${holeLabel}</span></div></div>
+    <div class="donut-legend">${legend}</div></div>`;
+}
+function drawDonuts(rows){
+  const online = rows.filter(p=>isOnline(p)).length, offline = rows.length-online;
+  renderDonut('connDonut', [
+    {label:'Online', value:online, color:'#16a34a'}, {label:'Offline', value:offline, color:'#dc2626'},
+  ], 'online', rows.length ? Math.round(100*online/rows.length)+'%' : '—');
+  const moving = rows.filter(p=>p.status==='moving').length, still = rows.filter(p=>p.status==='still').length;
+  renderDonut('statusDonut', [
+    {label:'Moving', value:moving, color:'#16a34a'}, {label:'Still', value:still, color:'#d97706'},
+  ], 'moving', rows.length ? Math.round(100*moving/rows.length)+'%' : '—');
+}
+function drawAssignedDonut(rows){
+  const assignable = rows.filter(p=>p.in_assigned_area != null);
+  const inArea = assignable.filter(p=>p.in_assigned_area === true).length;
+  const outArea = assignable.length - inArea;
+  renderDonut('assignedDonut', [
+    {label:'In assigned area', value:inArea, color:'#16a34a'},
+    {label:'Outside assigned area', value:outArea, color:'#dc2626'},
+  ], 'in area', assignable.length ? Math.round(100*inArea/assignable.length)+'%' : '—');
+  document.getElementById('assignedNote').textContent = assignable.length
+    ? `Of ${fmt(assignable.length)} Lahore vehicles with a known home town, ${fmt(inArea)} are currently within it and ${fmt(outArea)} have moved to a different town. Snapshot-only: this is current status, not a tracked duration -- that needs multiple dated snapshots stacked over time.`
+    : 'No Lahore vehicles with a known home town in the current view.';
+}
+function drawAnomalies(rows){
+  // counts reflect every OTHER active filter but not state.anomaly itself,
+  // so the badges stay meaningful (and clickable to switch) once one is selected.
+  const baseline = state.anomaly ? filtered({skipAnomaly:true}) : rows;
+  const counts = ANOMALY_TYPES.map(a => ({...a, n: baseline.filter(a.test).length}));
+  document.getElementById('anomalyList').innerHTML = counts.map(a => {
+    const active = state.anomaly===a.key ? 'active' : '';
+    const zero = a.n===0 ? 'zero' : '';
+    return `<div class="anomaly-row ${active} ${zero}" data-k="${a.key}"><span>${a.label}</span><span class="n">${fmt(a.n)}</span></div>`;
+  }).join('');
+  document.querySelectorAll('.anomaly-row').forEach(el=>{
+    if(el.classList.contains('zero')) return;
+    el.onclick = () => {
+      state.anomaly = state.anomaly===el.dataset.k ? '' : el.dataset.k;
+      document.getElementById('anomalySel').value = state.anomaly;
+      syncSSel('anomalySel');
+      render();
+    };
+  });
+}
+function drawTownTargets(rows){
+  const targets = DATA.town_targets || [];
+  if(!targets.length){
+    document.getElementById('townTargets').innerHTML = '<div class="note">No town target data -- run extract_town_targets.py against "Lahore Fleet+LRs.xlsx" then rebuild.</div>';
+    return;
+  }
+  const live = groupRows(rows.filter(p=>p.uc_town), p=>p.uc_town);
+  const lrLive = groupRows(rows.filter(p=>p.uc_town && p.registry_category==='Loader Rickshaw'), p=>p.uc_town);
+  const items = targets.filter(t=>t.in_uc_geojson).map(t=>{
+    const lrG = lrLive.get(t.town) || [];
+    const fullG = live.get(t.town) || [];
+    return {town:t.town, targetLr:t.target_lr, lrDeployed:lrG.length,
+      targetTotal:t.target_total, fullDeployed:fullG.length};
+  });
+  const max = Math.max(1, ...items.map(x=>Math.max(x.targetLr,x.lrDeployed,x.targetTotal,x.fullDeployed)));
+  document.getElementById('townTargets').innerHTML = items.map(x=>{
+    const lrPct = x.targetLr ? Math.round(100*x.lrDeployed/x.targetLr) : null;
+    const fullPct = x.targetTotal ? Math.round(100*x.fullDeployed/x.targetTotal) : null;
+    return `<div class="tt-row">
+      <div class="tt-town">${x.town}</div>
+      <div class="tt-pair">
+        <div class="tt-head"><span>LR</span><span>target ${fmt(x.targetLr)} · deployed ${fmt(x.lrDeployed)}${lrPct!=null?` (${lrPct}%)`:''}</span></div>
+        <div class="tt-bar target"><i style="width:${Math.round(100*x.targetLr/max)}%"></i></div>
+        <div class="tt-bar deployed"><i style="width:${Math.round(100*x.lrDeployed/max)}%"></i></div>
+      </div>
+      <div class="tt-pair">
+        <div class="tt-head"><span>Full fleet</span><span>target ${fmt(x.targetTotal)} · deployed ${fmt(x.fullDeployed)}${fullPct!=null?` (${fullPct}%)`:''}</span></div>
+        <div class="tt-bar target"><i style="width:${Math.round(100*x.targetTotal/max)}%"></i></div>
+        <div class="tt-bar deployed full"><i style="width:${Math.round(100*x.fullDeployed/max)}%"></i></div>
+      </div>
     </div>`;
   }).join('');
 }
-function drawCharts(rows){
-  const movingCount = rows.filter(p=>p.status==='moving').length;
-  const stillCount = rows.filter(p=>p.status==='still').length;
-  drawBars('statusChart', [
-    {label:'Moving', value: fmt(movingCount), pct: rows.length ? 100 * movingCount / rows.length : 0},
-    {label:'Still', value: fmt(stillCount), pct: rows.length ? 100 * stillCount / rows.length : 0, kind:'warn'},
-  ]);
+function drawRecencyFunnel(rows){
   const r4 = rows.filter(p=>ageHours(p) <= 4).length;
   const r6 = rows.filter(p=>ageHours(p) > 4 && ageHours(p) <= 6).length;
   const r8 = rows.filter(p=>ageHours(p) > 6 && ageHours(p) <= 8).length;
   const r8p = rows.filter(p=>ageHours(p) > 8 || !Number.isFinite(ageHours(p))).length;
-  drawBars('recencyChart', [
-    {label:'0-4h', value: fmt(r4), pct: rows.length ? 100 * r4 / rows.length : 0},
-    {label:'4-6h', value: fmt(r6), pct: rows.length ? 100 * r6 / rows.length : 0, kind:'warn'},
-    {label:'6-8h', value: fmt(r8), pct: rows.length ? 100 * r8 / rows.length : 0, kind:'warn'},
-    {label:'8h+', value: fmt(r8p), pct: rows.length ? 100 * r8p / rows.length : 0, kind:'off'},
-  ]);
-  drawBars('districtChart', DISTRICT_ORDER.map(d => {
-    const count = rows.filter(p=>p.district===d).length;
-    return {label:d, value: fmt(count), pct: rows.length ? 100 * count / rows.length : 0};
-  }));
+  const stages = [
+    {label:'0-4h', value:r4, color:'linear-gradient(90deg,#0d9488,#0f766e)'},
+    {label:'4-6h', value:r6, color:'linear-gradient(90deg,#2563eb,#1d4ed8)'},
+    {label:'6-8h', value:r8, color:'linear-gradient(90deg,#d97706,#b45309)'},
+    {label:'8h+', value:r8p, color:'linear-gradient(90deg,#dc2626,#b91c1c)'},
+  ];
+  const max = Math.max(1, ...stages.map(s=>s.value));
+  document.getElementById('recencyFunnel').innerHTML = `<div class="funnel-wrap">` +
+    stages.map(s=>{
+      const pct = Math.max(34, Math.round(100*s.value/max));
+      return `<div class="funnel-stage" style="width:${pct}%;background:${s.color};border-radius:8px"><span>${s.label}</span>${fmt(s.value)}</div>`;
+    }).join('') + `</div>`;
+}
+function drawLeaderboard(rows){
+  const titleEl = document.getElementById('lbTitle');
+  let items;
+  if(state.rosterScoped && EMPLOYEES.length){
+    titleEl.textContent = 'Top staff by distance';
+    items = EMPLOYEES.filter(e=>e.uc_set.size).map(e=>{
+      const g = rows.filter(p=>p.uc && e.uc_set.has(p.uc));
+      return {name:e.name, sub: `${ROLE_LABEL[e.role]||e.role} · ${fmt(g.length)} vehicles`,
+        value: g.reduce((s,p)=>s+(p.distance_km||0),0), count:g.length};
+    });
+  } else {
+    titleEl.textContent = 'Top towns by distance';
+    items = TOWN_ORDER.map(t=>{
+      const g = rows.filter(p=>p.uc_town===t);
+      return {name:t, sub: `${fmt(g.length)} vehicles`, value: g.reduce((s,p)=>s+(p.distance_km||0),0), count:g.length};
+    });
+  }
+  items = items.filter(x=>x.count>0).sort((a,b)=>b.value-a.value).slice(0,5);
+  const max = Math.max(1, ...items.map(x=>x.value));
+  const colors = ['#0d9488','#3b6fd6','#5b3fc9','#d97706','#16a34a'];
+  document.getElementById('leaderboard').innerHTML = items.length ? items.map((x,i)=>{
+    const initials = x.name.trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+    const pct = Math.round(100*x.value/max);
+    return `<div class="lb-row">
+      <div class="lb-rank">#${i+1}</div>
+      <div class="lb-avatar" style="background:${colors[i%colors.length]}">${initials}</div>
+      <div class="lb-body"><b>${x.name}</b><div class="lb-bar"><i style="width:${pct}%"></i></div><span style="font-size:10px;color:var(--mut)">${x.sub}</span></div>
+      <div class="lb-val">${fmt(Math.round(x.value))}km</div>
+    </div>`;
+  }).join('') : '<div class="note">No data in the current view.</div>';
+}
+function drawZoneBoard(rows){
+  const groups = groupRows(rows.filter(p=>p.uc_zone), p=>p.uc_zone);
+  const items = [...groups.entries()].map(([zone,g])=>({
+    zone, town: ZONE_TOWN[zone]||g[0].uc_town||'', count:g.length,
+    value: g.reduce((s,p)=>s+(p.distance_km||0),0)}));
+  const shown = items.sort((a,b)=>b.value-a.value).slice(0,8);
+  const max = Math.max(1, ...shown.map(x=>x.value));
+  const colors = ['#0d9488','#3b6fd6','#5b3fc9','#d97706','#16a34a'];
+  const el = document.getElementById('zoneBoard');
+  if(!shown.length){ el.innerHTML = '<div class="note">No data in the current view.</div>'; return; }
+  el.innerHTML = shown.map((x,i)=>{
+    const pct = Math.round(100*x.value/max);
+    return `<div class="lb-row">
+      <div class="lb-rank">#${i+1}</div>
+      <div class="lb-avatar" style="background:${colors[i%colors.length]}">${x.zone.replace('Zone-','')}</div>
+      <div class="lb-body"><b>${x.zone}</b><div class="lb-bar"><i style="width:${pct}%"></i></div><span style="font-size:10px;color:var(--mut)">${x.town} · ${fmt(x.count)} vehicles</span></div>
+      <div class="lb-val">${fmt(Math.round(x.value))}km</div>
+    </div>`;
+  }).join('') + (items.length>8 ? `<div class="note" style="margin-top:6px">Showing top 8 of ${items.length} zones with vehicles in view (of ${zoneOptions.length} total).</div>` : '');
+}
+function drawHoursTable(rows){
+  const {rows:byTown, totals, excluded} = buildHoursTable(rows);
+  const el = document.getElementById('hoursTable');
+  if(!byTown.length){ el.innerHTML = '<div class="note">No working-hours data in the current view.</div>'; return; }
+  const head = `<tr><th>Town</th>${WORK_BUCKETS.map(b=>`<th>${b.label}</th>`).join('')}<th>Total</th><th>% below 4h</th><th>% below 6h</th></tr>`;
+  const rowHtml = r => `<tr><td>${r.town}</td>${r.counts.map(c=>`<td>${fmt(c)}</td>`).join('')}<td><b>${fmt(r.total)}</b></td>` +
+    `<td>${r.pctBelow4==null?'—':r.pctBelow4+'%'}</td><td>${r.pctBelow6==null?'—':r.pctBelow6+'%'}</td></tr>`;
+  el.innerHTML = `<table class="hours-table"><thead>${head}</thead><tbody>` +
+    byTown.map(rowHtml).join('') + rowHtml(totals).replace('<tr>','<tr class="hours-total">') + `</tbody></table>` +
+    (excluded ? `<div class="note" style="margin-top:8px">${fmt(excluded)} vehicles in view have no working-hours reading and are excluded from this table.</div>` : '');
 }
 function drawPredictions(rows){
   const activeSoon = rows.filter(p => ageHours(p) <= 4 && p.status === 'moving').length;
   const riskOffline = rows.filter(p => !isOnline(p) || ageHours(p) > 8).length;
   const batteryRisk = rows.filter(p => p.battery_volt != null && p.battery_volt < 2).length;
   const outside = rows.filter(p => !p.uc).length;
+  const outOfArea = rows.filter(p => p.in_assigned_area === false).length;
   const likelyMove = rows.filter(p => p.status === 'still' && ageHours(p) <= 4).slice(0, 3).map(p => p.vehicle);
   const items = [
     {n: fmt(activeSoon), kind:'', text:`likely active in the next 4h — already moving and recently reported.`},
     {n: fmt(riskOffline), kind: riskOffline>0?'crit':'', text:`on the offline watchlist — older than 8h or not reporting.`},
     {n: fmt(batteryRisk), kind: batteryRisk>0?'warn':'', text:`battery concern — under 2V and should be checked.`},
     {n: fmt(outside), kind:'', text:`currently outside Lahore UC polygons.`},
+    {n: fmt(outOfArea), kind: outOfArea>0?'warn':'', text:`currently working outside their own assigned town.`},
     {n: likelyMove.length, kind:'', text: likelyMove.length ? `possible near-term movers: ${likelyMove.join(', ')}.` : `no near-term movers flagged from the current slice.`},
   ];
   document.getElementById('predictionList').innerHTML = items.map(it => `
@@ -719,7 +1370,7 @@ function drawHealth(rows){
     </div>
     <div class="health-body">
       <div class="health-verdict" style="color:${color}">${verdict}</div>
-      <div class="health-sub">${fmt(Math.round(movingPct*100))}% moving · ${fmt(Math.round(onlinePct*100))}% online · ${fmt(Math.round(batteryOkPct*100))}% battery OK, from ${fmt(rows.length)} vehicles in view.</div>
+      <div class="health-sub">${fmt(Math.round(movingPct*100))}% moving (40%) · ${fmt(Math.round(onlinePct*100))}% online (40%) · ${fmt(Math.round(batteryOkPct*100))}% battery OK (20%), from ${fmt(rows.length)} vehicles in view.</div>
     </div>`;
 }
 function drawSelected(rows){
@@ -734,10 +1385,12 @@ function drawSelected(rows){
   hint.textContent = chosen.vehicle;
   const details = [
     ['Vehicle', chosen.vehicle],
-    ['District', chosen.district],
     ['Status', chosen.status],
     ['Connectivity', isOnline(chosen) ? 'Online' : 'Offline'],
     ['UC / Town', chosen.uc ? `${chosen.uc} · ${chosen.uc_town || ''}`.trim() : 'Outside UC'],
+    ['Assigned (home) town', chosen.assigned_town || '—'],
+    ['In assigned area', chosen.in_assigned_area==null ? '—' : (chosen.in_assigned_area ? 'Yes' : 'No')],
+    ['Registry category', chosen.registry_category || '—'],
     ['Type', chosen.vehicle_type || '—'],
     ['Used for', chosen.used_for || '—'],
     ['Distance', fmt(chosen.distance_km, 2) + ' km'],
@@ -754,21 +1407,21 @@ function drawSelected(rows){
 }
 function drawRail(rowsAll){
   const rail=document.getElementById('rail');
-  rail.innerHTML = DISTRICT_ORDER.map(d=>{
-    const rows=rowsAll.filter(p=>p.district===d);
+  rail.innerHTML = TOWN_ORDER.map(t=>{
+    const rows=rowsAll.filter(p=>p.uc_town===t);
     const mv=rows.filter(p=>p.status==='moving').length;
     const st=rows.filter(p=>p.status==='still').length;
     const dist=rows.reduce((s,p)=>s+(p.distance_km||0),0);
     const tot=rows.length||1;
-    const active = state.district===d?'active':'';
-    return `<div class="drow ${active}" data-d="${d}">
-      <div class="dh"><span class="dn">${d}</span><span class="dc">${rows.length}</span></div>
+    const active = state.town===t?'active':'';
+    return `<div class="drow ${active}" data-d="${t}">
+      <div class="dh"><span class="dn">${t}</span><span class="dc">${rows.length}</span></div>
       <div class="bar"><span class="mv" style="width:${100*mv/tot}%"></span><span class="st" style="width:${100*st/tot}%"></span></div>
       <small>${mv} moving · ${fmt(dist,0)} km</small>
     </div>`;
   }).join('');
   document.querySelectorAll('.drow').forEach(el=>el.onclick=()=>{
-    state.district = state.district===el.dataset.d ? null : el.dataset.d;
+    state.town = state.town===el.dataset.d ? null : el.dataset.d;
     render(true);
   });
 }
@@ -788,6 +1441,8 @@ function buildReportText(rows){
   const riskOffline = rows.filter(p => !isOnline(p) || ageHours(p) > 8).length;
   const batteryRisk = rows.filter(p => p.battery_volt != null && p.battery_volt < 2).length;
   const outside = rows.filter(p => !p.uc).length;
+  const nAssignable = rows.filter(p => p.in_assigned_area != null).length;
+  const nInArea = rows.filter(p => p.in_assigned_area === true).length;
   const rule = '-'.repeat(40);
   const lines = [];
   lines.push('LWMC FLEET CONSOLE — OUTPUT REPORT');
@@ -797,24 +1452,71 @@ function buildReportText(rows){
   lines.push(`Generated      : ${referenceTime.toLocaleString()}`);
   lines.push('');
   lines.push('FILTERS APPLIED'); lines.push(rule);
-  lines.push(`District       : ${state.district || 'All'}`);
+  lines.push(`Town           : ${state.town || 'All'}`);
   lines.push(`Status         : ${state.status}`);
   lines.push(`Recent activity: ${state.recent==='all' ? 'All' : 'last '+state.recent+'h'}`);
   lines.push(`Connectivity   : ${state.conn}`);
   lines.push(`UC             : ${state.uc || 'All'}`);
+  lines.push(`Zone           : ${state.zone || 'All'}`);
   lines.push(`Vehicle type   : ${state.type || 'All'}`);
   lines.push(`Search         : ${state.q || '(none)'}`);
+  lines.push(`Roster mode    : ${state.rosterScoped ? 'Roster-scoped (Lahore, roster UCs only)' : 'Full fleet'}`);
+  lines.push(`Employee       : ${state.employee ? ((EMPLOYEE_BY_ID.get(state.employee)||{}).name || state.employee) : 'All'}`);
+  lines.push(`Anomaly filter : ${state.anomaly ? (ANOMALY_TYPES.find(a=>a.key===state.anomaly)||{}).label || state.anomaly : 'None'}`);
   lines.push('');
   lines.push('SUMMARY'); lines.push(rule);
   lines.push(`Moving / Still  : ${fmt(moving)} / ${fmt(still)}`);
   lines.push(`Online / Offline: ${fmt(online)} / ${fmt(rows.length-online)}`);
   lines.push(`Total distance  : ${fmt(dist,0)} km`);
   lines.push('');
-  lines.push('BY DISTRICT'); lines.push(rule);
-  DISTRICT_ORDER.forEach(d=>{
-    const r = rows.filter(p=>p.district===d);
-    lines.push(`${d.padEnd(16)} ${fmt(r.length).padStart(6)} vehicles  |  ${fmt(r.filter(p=>p.status==='moving').length).padStart(5)} moving  |  ${fmt(r.reduce((s,p)=>s+(p.distance_km||0),0),0).padStart(7)} km`);
+  lines.push('ANOMALIES (in current view)'); lines.push(rule);
+  ANOMALY_TYPES.forEach(a=>{
+    const n = rows.filter(a.test).length;
+    lines.push(`${a.label.padEnd(34)} ${fmt(n).padStart(6)} vehicles`);
   });
+  lines.push('');
+  lines.push('BY TOWN'); lines.push(rule);
+  TOWN_ORDER.forEach(t=>{
+    const r = rows.filter(p=>p.uc_town===t);
+    lines.push(`${t.padEnd(20)} ${fmt(r.length).padStart(6)} vehicles  |  ${fmt(r.filter(p=>p.status==='moving').length).padStart(5)} moving  |  ${fmt(r.reduce((s,p)=>s+(p.distance_km||0),0),0).padStart(7)} km`);
+  });
+  lines.push('');
+  lines.push('BY ZONE'); lines.push(rule);
+  buildZoneSheet(rows).slice(1).forEach(r=>{
+    lines.push(`${String(r[0]).padEnd(10)} ${String(r[1]).padEnd(20)} ${fmt(r[2]).padStart(3)} UCs  |  ${fmt(r[3]).padStart(6)} vehicles  |  ${fmt(r[4]).padStart(5)} moving  |  ${fmt(r[5],0).padStart(7)} km`);
+  });
+  lines.push('');
+  lines.push('WORKING HOURS DISTRIBUTION (by town)'); lines.push(rule);
+  {
+    const {rows: hRows, totals: hTotals} = buildHoursTable(rows);
+    lines.push(`${'Town'.padEnd(20)} ${WORK_BUCKETS.map(b=>b.label.padStart(9)).join(' ')} ${'Total'.padStart(8)} ${'<4h'.padStart(6)} ${'<6h'.padStart(6)}`);
+    hRows.forEach(r=>{
+      lines.push(`${r.town.padEnd(20)} ${r.counts.map(c=>fmt(c).padStart(9)).join(' ')} ${fmt(r.total).padStart(8)} ${(r.pctBelow4==null?'—':r.pctBelow4+'%').padStart(6)} ${(r.pctBelow6==null?'—':r.pctBelow6+'%').padStart(6)}`);
+    });
+    lines.push(`${hTotals.town.padEnd(20)} ${hTotals.counts.map(c=>fmt(c).padStart(9)).join(' ')} ${fmt(hTotals.total).padStart(8)} ${(hTotals.pctBelow4==null?'—':hTotals.pctBelow4+'%').padStart(6)} ${(hTotals.pctBelow6==null?'—':hTotals.pctBelow6+'%').padStart(6)}`);
+  }
+  lines.push('');
+  lines.push('BY EMPLOYEE (roster)'); lines.push(rule);
+  if(EMPLOYEES.length){
+    buildEmployeeSheet(rows).slice(1).forEach(r=>{
+      lines.push(`${String(r[0]).padEnd(22)} ${String(r[1]).padEnd(16)} ${String(r[2]).padStart(14)}  |  ${fmt(r[3]).padStart(6)} vehicles  |  ${fmt(r[4]).padStart(5)} moving  |  ${fmt(r[8],0).padStart(7)} km`);
+    });
+    lines.push(`Roster coverage: ${fmt(ROSTER_UC_SET.size)}/${fmt(ALL_LAHORE_UCS.size)} Lahore UCs (${rosterCoveragePct}%) covered by ${fmt(EMPLOYEES.length)} staff.`);
+  } else {
+    lines.push('No roster data available.');
+  }
+  lines.push('');
+  lines.push('TOWN TARGETS (LR + full fleet, vs. registry-matched live-deployed)'); lines.push(rule);
+  if((DATA.town_targets||[]).length){
+    buildTownTargetSheet(rows).slice(1).forEach(r=>{
+      lines.push(`${String(r[0]).padEnd(20)} LR target=${String(r[1]).padStart(4)} deployed=${String(r[2]).padStart(4)} (${r[4]===''?'n/a':r[4]+'%'})  |  `+
+        `full target=${String(r[5]).padStart(4)} deployed=${String(r[6]).padStart(4)} (${r[8]===''?'n/a':r[8]+'%'})  in-area=${r[9]}  out-of-area=${r[10]}`);
+    });
+    lines.push('Note: targets come from the LWMC fleet establishment registry (Lahore Fleet+LRs.xlsx), matched to live vehicles by Vehicle ID (~96% match rate) -- far more reliable than VTMS\'s own vehicle type field, which is blank on most rows.');
+  } else {
+    lines.push('No town target data available.');
+  }
+  lines.push(`In assigned area: ${fmt(nInArea)}/${fmt(nAssignable)} Lahore vehicles with a known home town are currently within it (${nAssignable?Math.round(100*nInArea/nAssignable):0}%).`);
   lines.push('');
   lines.push('FLEET HEALTH'); lines.push(rule);
   lines.push(`Composite score: ${score} / 100`);
@@ -828,7 +1530,7 @@ function buildReportText(rows){
   lines.push('');
   lines.push(`VEHICLE LIST (raw data, first 200 of ${fmt(rows.length)} shown)`); lines.push(rule);
   rows.slice(0,200).forEach(p=>{
-    lines.push(`${(p.vehicle||'').padEnd(16)} ${(p.district||'').padEnd(14)} ${(p.status||'').padEnd(8)} dist=${fmt(p.distance_km,2)}km  batt=${p.battery_volt!=null?fmt(p.battery_volt,1)+'V':'-'}  last=${p.last_received||'-'}`);
+    lines.push(`${(p.vehicle||'').padEnd(16)} ${(p.uc_town||'—').padEnd(18)} ${(p.status||'').padEnd(8)} dist=${fmt(p.distance_km,2)}km  batt=${p.battery_volt!=null?fmt(p.battery_volt,1)+'V':'-'}  last=${p.last_received||'-'}`);
   });
   if(rows.length>200) lines.push(`... and ${fmt(rows.length-200)} more vehicles not shown here (see the table for the full list).`);
   return lines.join('\n');
@@ -853,17 +1555,355 @@ function downloadReport(){
 document.getElementById('genReport').onclick = generateReport;
 document.getElementById('dlReport').onclick = downloadReport;
 
+// ---- xlsx export (zero-dependency OOXML + stored-mode ZIP writer, fully offline) ----
+function makeCrcTable(){
+  const table = [];
+  for(let n=0;n<256;n++){
+    let c = n;
+    for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    table[n] = c >>> 0;
+  }
+  return table;
+}
+const CRC_TABLE = makeCrcTable();
+function crc32(bytes){
+  let c = 0xFFFFFFFF;
+  for(let i=0;i<bytes.length;i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+class ByteWriter{
+  constructor(){ this.chunks = []; this.length = 0; }
+  bytes(u8){ this.chunks.push(u8); this.length += u8.length; }
+  u16(v){ const b=new Uint8Array(2); new DataView(b.buffer).setUint16(0,v,true); this.bytes(b); }
+  u32(v){ const b=new Uint8Array(4); new DataView(b.buffer).setUint32(0,v>>>0,true); this.bytes(b); }
+  toUint8Array(){
+    const out = new Uint8Array(this.length);
+    let o=0; for(const c of this.chunks){ out.set(c,o); o+=c.length; }
+    return out;
+  }
+}
+const ZIP_ENC = new TextEncoder();
+function makeZip(files){
+  const local = new ByteWriter(), central = new ByteWriter(), offsets = [];
+  for(const f of files){
+    const nameBytes = ZIP_ENC.encode(f.name);
+    const crc = crc32(f.data);
+    offsets.push(local.length);
+    local.u32(0x04034b50); local.u16(20); local.u16(0); local.u16(0); local.u16(0); local.u16(0);
+    local.u32(crc); local.u32(f.data.length); local.u32(f.data.length);
+    local.u16(nameBytes.length); local.u16(0);
+    local.bytes(nameBytes); local.bytes(f.data);
+  }
+  const cdStart = local.length;
+  files.forEach((f,i)=>{
+    const nameBytes = ZIP_ENC.encode(f.name);
+    const crc = crc32(f.data);
+    central.u32(0x02014b50); central.u16(20); central.u16(20); central.u16(0); central.u16(0); central.u16(0); central.u16(0);
+    central.u32(crc); central.u32(f.data.length); central.u32(f.data.length);
+    central.u16(nameBytes.length); central.u16(0); central.u16(0); central.u16(0); central.u16(0); central.u32(0);
+    central.u32(offsets[i]); central.bytes(nameBytes);
+  });
+  const cdSize = central.length;
+  const end = new ByteWriter();
+  end.u32(0x06054b50); end.u16(0); end.u16(0); end.u16(files.length); end.u16(files.length);
+  end.u32(cdSize); end.u32(cdStart); end.u16(0);
+  const total = new ByteWriter();
+  total.bytes(local.toUint8Array()); total.bytes(central.toUint8Array()); total.bytes(end.toUint8Array());
+  return total.toUint8Array();
+}
+function xmlEscape(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
+}
+function colName(n){
+  let s=''; while(n>0){ const r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=Math.floor((n-1)/26); }
+  return s;
+}
+function sheetXml(rows){
+  const rowsXml = rows.map((row, ri) => {
+    const cells = row.map((val, ci) => {
+      const ref = colName(ci+1) + (ri+1);
+      const styleAttr = ri===0 ? ' s="1"' : '';
+      if(typeof val === 'number' && isFinite(val)) return `<c r="${ref}"${styleAttr}><v>${val}</v></c>`;
+      const text = val==null ? '' : String(val);
+      return `<c r="${ref}" t="inlineStr"${styleAttr}><is><t xml:space="preserve">${xmlEscape(text)}</t></is></c>`;
+    }).join('');
+    return `<row r="${ri+1}">${cells}</row>`;
+  }).join('');
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rowsXml}</sheetData></worksheet>`;
+}
+const XLSX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
+<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
+<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="2">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+function buildXlsx(sheets){
+  const files = [];
+  files.push({name:'[Content_Types].xml', data: ZIP_ENC.encode(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+    `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
+    `<Default Extension="xml" ContentType="application/xml"/>` +
+    `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
+    `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
+    sheets.map((s,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') +
+    `</Types>`)});
+  files.push({name:'_rels/.rels', data: ZIP_ENC.encode(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>` +
+    `</Relationships>`)});
+  files.push({name:'xl/workbook.xml', data: ZIP_ENC.encode(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+    `<sheets>` + sheets.map((s,i)=>`<sheet name="${xmlEscape(s.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('') + `</sheets>` +
+    `</workbook>`)});
+  files.push({name:'xl/_rels/workbook.xml.rels', data: ZIP_ENC.encode(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+    sheets.map((s,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('') +
+    `<Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
+    `</Relationships>`)});
+  files.push({name:'xl/styles.xml', data: ZIP_ENC.encode(XLSX_STYLES)});
+  sheets.forEach((s,i)=>{ files.push({name:`xl/worksheets/sheet${i+1}.xml`, data: ZIP_ENC.encode(sheetXml(s.rows))}); });
+  return makeZip(files);
+}
+
+function bytesToBase64(bytes){
+  let binary = '';
+  const chunkSize = 0x8000;
+  for(let i = 0; i < bytes.length; i += chunkSize){
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+// ---- analytical report sheets ----
+function groupRows(rows, keyFn){
+  const map = new Map();
+  rows.forEach(p=>{
+    const k = keyFn(p) ?? '(unspecified)';
+    if(!map.has(k)) map.set(k, []);
+    map.get(k).push(p);
+  });
+  return map;
+}
+function groupStatsRows(rows, keyFn, keyLabel){
+  const groups = groupRows(rows, keyFn);
+  const out = [[keyLabel,'Vehicles','Moving','Still','Online','Offline','Total distance (km)','Avg distance (km)']];
+  [...groups.entries()].sort((a,b)=> b[1].length - a[1].length).forEach(([k, g])=>{
+    const moving = g.filter(p=>p.status==='moving').length;
+    const still = g.filter(p=>p.status==='still').length;
+    const online = g.filter(p=>isOnline(p)).length;
+    const dist = g.reduce((s,p)=>s+(p.distance_km||0),0);
+    out.push([k, g.length, moving, still, online, g.length-online, Math.round(dist*100)/100, Math.round((dist/g.length)*100)/100]);
+  });
+  return out;
+}
+function buildSummarySheet(rows){
+  const total = rows.length || 1;
+  const moving = rows.filter(p=>p.status==='moving').length;
+  const still = rows.filter(p=>p.status==='still').length;
+  const online = rows.filter(p=>isOnline(p)).length;
+  const dist = rows.reduce((s,p)=>s+(p.distance_km||0),0);
+  const battOk = 1 - (rows.filter(p=>p.battery_volt!=null && p.battery_volt<2).length/total);
+  const score = Math.round((moving/total)*40 + (online/total)*40 + battOk*20);
+  return [
+    ['LWMC Fleet Console — Analytical Report', ''],
+    ['Report period', (state.date || DATA.snapshot) + ((state.timeFrom||state.timeTo) ? ' · '+(state.timeFrom||'00:00')+'-'+(state.timeTo||'23:59') : '')],
+    ['Generated', referenceTime.toLocaleString()],
+    ['', ''],
+    ['Filters applied', ''],
+    ['Town', state.town || 'All'],
+    ['Status', state.status],
+    ['Recent activity', state.recent==='all' ? 'All' : 'last '+state.recent+'h'],
+    ['Connectivity', state.conn],
+    ['UC', state.uc || 'All'],
+    ['Zone', state.zone || 'All'],
+    ['Vehicle type', state.type || 'All'],
+    ['Search', state.q || '(none)'],
+    ['Roster mode', state.rosterScoped ? 'Roster-scoped' : 'Full fleet'],
+    ['Employee', state.employee ? ((EMPLOYEE_BY_ID.get(state.employee)||{}).name || state.employee) : 'All'],
+    ['Anomaly filter', state.anomaly ? (ANOMALY_TYPES.find(a=>a.key===state.anomaly)||{}).label || state.anomaly : 'None'],
+    ['', ''],
+    ['Summary', ''],
+    ['Vehicles in view', rows.length],
+    ['Moving', moving],
+    ['Still', still],
+    ['Online', online],
+    ['Offline', rows.length-online],
+    ['Total distance (km)', Math.round(dist*100)/100],
+    ['Fleet health score (/100)', score],
+  ];
+}
+function buildWatchlistSheet(rows){
+  const out = [['Vehicle','Town','Office','Issue','Battery (V)','Reporting status','Last received','Age']];
+  rows.forEach(p=>{
+    const issues = vehicleAnomalies(p).map(a=>a.label);
+    if(!isOnline(p)) issues.unshift('Offline');
+    if(issues.length){
+      out.push([p.vehicle, p.uc_town||'—', p.office||'', issues.join('; '), p.battery_volt!=null?p.battery_volt:'', p.reporting_status||'', p.last_received||'', ageLabel(p)]);
+    }
+  });
+  return out;
+}
+function buildDetailSheet(rows){
+  const cols = Object.keys(RAW_FIELD_LABELS);
+  const out = [cols.map(k=>RAW_FIELD_LABELS[k])];
+  rows.forEach(p=>{
+    out.push(cols.map(k=>{
+      const v = p[k];
+      if(v==null) return '';
+      if(typeof v === 'boolean') return v ? 'Yes' : 'No';
+      return v;
+    }));
+  });
+  return out;
+}
+function buildUcSheet(rows){
+  const groups = groupRows(rows.filter(p=>p.uc), p=>p.uc);
+  const out = [['UC','Town','Vehicles','Moving','Total distance (km)']];
+  [...groups.entries()].sort((a,b)=> b[1].length - a[1].length).forEach(([uc, g])=>{
+    out.push([uc, g[0].uc_town||'', g.length, g.filter(p=>p.status==='moving').length, Math.round(g.reduce((s,p)=>s+(p.distance_km||0),0)*100)/100]);
+  });
+  return out;
+}
+function buildZoneSheet(rows){
+  const groups = groupRows(rows.filter(p=>p.uc_zone), p=>p.uc_zone);
+  const out = [['Zone','Town','UCs in zone','Vehicles','Moving','Total distance (km)']];
+  [...groups.entries()].sort((a,b)=>zoneSortKey(a[0])-zoneSortKey(b[0])).forEach(([zone, g])=>{
+    out.push([zone, ZONE_TOWN[zone]||g[0].uc_town||'', (ZONE_TO_UCS[zone]||new Set()).size, g.length,
+      g.filter(p=>p.status==='moving').length, Math.round(g.reduce((s,p)=>s+(p.distance_km||0),0)*100)/100]);
+  });
+  return out;
+}
+function buildHoursSheet(rows){
+  const {rows:byTown, totals} = buildHoursTable(rows);
+  const out = [['Town', ...WORK_BUCKETS.map(b=>b.label), 'Total', '% below 4h', '% below 6h']];
+  byTown.forEach(r=>out.push([r.town, ...r.counts, r.total, r.pctBelow4==null?'':r.pctBelow4, r.pctBelow6==null?'':r.pctBelow6]));
+  out.push(['All towns', ...totals.counts, totals.total, totals.pctBelow4==null?'':totals.pctBelow4, totals.pctBelow6==null?'':totals.pctBelow6]);
+  return out;
+}
+function buildEmployeeSheet(rows){
+  // per-employee filter-and-aggregate, not a single-key grouping: a UC can
+  // belong to more than one employee's coverage set (TM/FM/ZO/AM Yard overlap
+  // by design), so this is not a disjoint partition of `rows`.
+  const out = [['Employee','Role','Shift','Coverage (UCs)','Vehicles','Moving','Still','Online','Offline','Total distance (km)','Avg distance (km)']];
+  EMPLOYEES.forEach(e=>{
+    if(!e.uc_set.size){
+      out.push([e.name, ROLE_LABEL[e.role]||e.role, e.shift||'', '0 UCs — unresolved', 0,0,0,0,0,0,0]);
+      return;
+    }
+    const g = rows.filter(p=>p.uc && e.uc_set.has(p.uc));
+    const moving = g.filter(p=>p.status==='moving').length;
+    const still = g.filter(p=>p.status==='still').length;
+    const online = g.filter(p=>isOnline(p)).length;
+    const dist = g.reduce((s,p)=>s+(p.distance_km||0),0);
+    out.push([e.name, ROLE_LABEL[e.role]||e.role, e.shift||'', e.uc_set.size, g.length, moving, still, online, g.length-online,
+      Math.round(dist*100)/100, g.length ? Math.round((dist/g.length)*100)/100 : 0]);
+  });
+  return out;
+}
+function buildTownTargetSheet(rows){
+  const out = [['Town','LR Target','LR Deployed (live)','LR Deployed moving','LR Deployment %',
+    'Full fleet target','Full fleet deployed','Full fleet moving','Full fleet deployment %',
+    'In assigned area','Outside assigned area']];
+  const live = groupRows(rows.filter(p=>p.uc_town), p=>p.uc_town);
+  const lrLive = groupRows(rows.filter(p=>p.uc_town && p.registry_category==='Loader Rickshaw'), p=>p.uc_town);
+  const assignedByTown = groupRows(rows.filter(p=>p.assigned_town), p=>p.assigned_town);
+  (DATA.town_targets||[]).forEach(t=>{
+    const lrG = lrLive.get(t.town) || [];
+    const fullG = live.get(t.town) || [];
+    const home = assignedByTown.get(t.town) || [];
+    const inArea = home.filter(p=>p.in_assigned_area===true).length;
+    const outArea = home.filter(p=>p.in_assigned_area===false).length;
+    out.push([t.town, t.target_lr, lrG.length, lrG.filter(p=>p.status==='moving').length,
+      t.target_lr ? Math.round(1000*lrG.length/t.target_lr)/10 : '',
+      t.target_total, fullG.length, fullG.filter(p=>p.status==='moving').length,
+      t.target_total ? Math.round(1000*fullG.length/t.target_total)/10 : '',
+      inArea, outArea]);
+  });
+  return out;
+}
+function exportExcelReport(){
+  const btn = document.getElementById('xlsxReport');
+  const status = document.getElementById('xlsxStatus');
+  btn.disabled = true; status.textContent = 'Building workbook…';
+  try{
+    const rows = filtered();
+    const sheets = [
+      {name:'Summary', rows: buildSummarySheet(rows)},
+      {name:'By Town', rows: groupStatsRows(rows, p=>p.uc_town, 'Town')},
+      {name:'By Office', rows: groupStatsRows(rows, p=>p.office, 'Office')},
+      {name:'By Vehicle Type', rows: groupStatsRows(rows, p=>p.vehicle_type, 'Vehicle type')},
+      {name:'By UC', rows: buildUcSheet(rows)},
+      {name:'By Zone', rows: buildZoneSheet(rows)},
+      {name:'Working Hours', rows: buildHoursSheet(rows)},
+      {name:'By Employee', rows: buildEmployeeSheet(rows)},
+      {name:'Town Targets', rows: buildTownTargetSheet(rows)},
+      {name:'Watchlist', rows: buildWatchlistSheet(rows)},
+      {name:'Vehicle Detail', rows: buildDetailSheet(rows)},
+    ];
+    const bytes = buildXlsx(sheets);
+    const stamp = (state.date || DATA.snapshot) + '_' + String(referenceTime.getHours()).padStart(2,'0') + String(referenceTime.getMinutes()).padStart(2,'0');
+    const filename = `LWMC_Fleet_Report_${stamp}.xlsx`;
+    const bridge = window.dashboardBridge || DASHBOARD_BRIDGE;
+    if (bridge && typeof bridge.saveXlsx === 'function') {
+      const saved = bridge.saveXlsx(bytesToBase64(bytes), filename);
+      if (!saved) throw new Error('Desktop save bridge rejected the workbook.');
+      status.textContent = `Exported ${fmt(rows.length)} vehicles across ${sheets.length} sheets to ${filename}.`;
+      return;
+    }
+    const blob = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    status.textContent = `Exported ${fmt(rows.length)} vehicles across ${sheets.length} sheets.`;
+  } catch(e){
+    status.textContent = 'Export failed: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById('xlsxReport').onclick = exportExcelReport;
+
+// ---- roster mode UI ----
+const ALL_LAHORE_UCS = new Set((DATA.ucs.features||[]).map(f=>f.properties.uc));
+const rosterCoveragePct = ALL_LAHORE_UCS.size ? (100*ROSTER_UC_SET.size/ALL_LAHORE_UCS.size).toFixed(1) : '0.0';
+const ROSTER_COVERAGE_NOTE = `Roster coverage: ${fmt(ROSTER_UC_SET.size)}/${fmt(ALL_LAHORE_UCS.size)} Lahore UCs (${rosterCoveragePct}%) covered by ${fmt(EMPLOYEES.length)} staff on the roster.`;
+const FULL_COVERAGE_NOTE = document.getElementById('coverageNote').textContent;
+function updateRosterUI(){
+  document.getElementById('coverageNote').textContent = state.rosterScoped
+    ? FULL_COVERAGE_NOTE + ' ' + ROSTER_COVERAGE_NOTE
+    : FULL_COVERAGE_NOTE;
+}
+
 // ---- render ----
 function render(fit=false){
   const rows=filtered();
+  updateRosterUI();
   drawKpis(rows); drawRail(rows); buildHead(); drawDateBlock(rows);
-  drawOverview(rows); drawCharts(rows); drawHealth(rows); drawPredictions(rows); drawSelected(rows);
-  drawMarkers(rows); drawTable(rows);
+  drawOverview(rows); drawHealth(rows); drawPredictions(rows); drawSelected(rows);
+  drawStatCards(rows); drawComboChart(rows); drawDonuts(rows); drawRecencyFunnel(rows); drawLeaderboard(rows);
+  drawTownTargets(rows); drawAssignedDonut(rows); drawAnomalies(rows);
+  drawZoneBoard(rows); drawHoursTable(rows);
+  drawMarkers(rows); drawTable(rows); updateMapBadge(rows); updateUcLabels();
   document.getElementById('tcount').textContent = fmt(rows.length)+' shown';
   const timeBit = (state.timeFrom || state.timeTo) ? ` · ${state.timeFrom||'00:00'}-${state.timeTo||'23:59'}` : '';
+  const empBit = state.employee ? ` · ${(EMPLOYEE_BY_ID.get(state.employee)||{}).name || ''}` : '';
+  let searchBit = '';
+  if(state.q){
+    const matches = matchingEmployees(state.q);
+    if(matches.length) searchBit = ` · search matched ${fmt(matches.length)} staff (${matches.slice(0,3).map(e=>e.name).join(', ')}${matches.length>3?', …':''})`;
+  }
   document.getElementById('filterSummary').textContent =
     `Showing ${fmt(rows.length)} vehicles · ${fmt(rows.filter(p=>isOnline(p)).length)} online · ` +
-    `${state.recent==='all'?'all recency':`last ${state.recent}h`} · ${state.uc || 'all UCs'} · ${state.date || 'all dates'}${timeBit}`;
+    `${state.recent==='all'?'all recency':`last ${state.recent}h`} · ${state.uc || 'all UCs'} · ${state.zone || 'all zones'} · ${state.date || 'all dates'}${timeBit}` +
+    `${state.rosterScoped ? ' · roster-scoped' : ''}${empBit}${searchBit}`;
   if(fit && rows.length){
     const b=L.latLngBounds(rows.filter(p=>p.lat!=null).map(p=>[p.lat,p.lon]));
     if(b.isValid()) map.fitBounds(b.pad(.1));
@@ -887,17 +1927,150 @@ const types=[...new Set(POINTS.map(p=>p.vehicle_type).filter(Boolean))].sort();
 document.getElementById('typeSel').innerHTML='<option value="">All vehicle types</option>'+
   types.map(t=>`<option value="${t}">${t}</option>`).join('');
 document.getElementById('ucSel').onchange=e=>{state.uc=e.target.value; render();};
+document.getElementById('zoneSel').onchange=e=>{state.zone=e.target.value; render();};
 document.getElementById('typeSel').onchange=e=>{state.type=e.target.value; render();};
 document.getElementById('dateSel').onchange=e=>{state.date=e.target.value; render();};
 document.getElementById('timeFrom').onchange=e=>{state.timeFrom=e.target.value; render();};
 document.getElementById('timeTo').onchange=e=>{state.timeTo=e.target.value; render();};
-document.getElementById('search').oninput=e=>{state.q=e.target.value.toLowerCase().trim(); render();};
+document.getElementById('search').oninput=e=>{
+  state.q=e.target.value.toLowerCase().trim(); document.getElementById('topSearch').value=e.target.value; render();
+};
+document.getElementById('topSearch').oninput=e=>{
+  state.q=e.target.value.toLowerCase().trim(); document.getElementById('search').value=e.target.value; render();
+};
+document.getElementById('genReportHeader').onclick = generateReport;
+document.getElementById('xlsxReportHeader').onclick = exportExcelReport;
+// Overview/Analytics/Map live in the '.content' scroll column; Reports
+// lives in the separate '.right' sidebar column and Fleet table in its own
+// '.bottom' region -- each scrolls independently, so a click on those two
+// can leave '.content' untouched and look like nothing happened. Setting
+// the active state directly on click (instead of relying only on the
+// '.content' scroll-spy below) and flashing the target section makes every
+// nav click give immediate, visible feedback regardless of which container
+// actually moves.
+document.getElementById('navList').querySelectorAll('.navlink').forEach(link=>{
+  link.onclick = () => {
+    const el = document.getElementById(link.dataset.target);
+    if(!el) return;
+    document.getElementById('navList').querySelectorAll('.navlink').forEach(l=>l.classList.toggle('active', l===link));
+    el.scrollIntoView({behavior:'smooth', block:'start'});
+    el.classList.remove('nav-flash');
+    void el.offsetWidth; // restart the animation even on repeated clicks
+    el.classList.add('nav-flash');
+    setTimeout(()=>el.classList.remove('nav-flash'), 850);
+  };
+});
+document.querySelector('.content').addEventListener('scroll', () => {
+  const links = [...document.getElementById('navList').querySelectorAll('.navlink')]
+    .filter(l => ['secOverview','secAnalytics','secMap'].includes(l.dataset.target));
+  const positions = links.map(l => {
+    const el = document.getElementById(l.dataset.target);
+    return el ? Math.abs(el.getBoundingClientRect().top - 90) : Infinity;
+  });
+  const closest = positions.indexOf(Math.min(...positions));
+  const allLinks = [...document.getElementById('navList').querySelectorAll('.navlink')];
+  allLinks.forEach(l => l.classList.toggle('active', l===links[closest]));
+}, {passive:true});
+document.getElementById('modeToggle').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+  document.getElementById('modeToggle').querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on'); state.rosterScoped = c.dataset.mode==='roster';
+  render(true);
+});
+document.getElementById('empSel').onchange=e=>{state.employee=e.target.value; render();};
+document.getElementById('anomalySel').onchange=e=>{state.anomaly=e.target.value; render();};
+
+// ---- searchable dropdowns ----
+// Native <select> stays the single source of truth (state, onchange
+// handlers, and every direct ".value=" assignment elsewhere keep working
+// unchanged) -- this overlays a type-to-filter text box + option list,
+// since a couple of these (UC: 274+, Employee: 270+) are unusable to scan
+// by scrolling a plain <select>. The panel is portaled to <body> with
+// position:fixed (not nested under .side) so the sidebar's own
+// overflow-y:auto doesn't clip it.
+const SSEL={};
+function selLabel(sel){ const o=sel.options[sel.selectedIndex]; return o?o.text:''; }
+function syncSSel(id){ const s=SSEL[id]; if(s) s.input.value=selLabel(s.sel); }
+function enhanceSearchableSelect(id){
+  const sel=document.getElementById(id);
+  const wrap=document.createElement('div');
+  wrap.className='ssel-wrap';
+  sel.parentNode.insertBefore(wrap, sel);
+  wrap.appendChild(sel);
+  sel.classList.add('ssel-native');
+  const input=document.createElement('input');
+  input.type='text'; input.autocomplete='off'; input.className='ssel-input'; input.placeholder='Search…';
+  wrap.appendChild(input);
+  const arrow=document.createElement('span');
+  arrow.className='ssel-arrow';
+  arrow.innerHTML='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+  wrap.appendChild(arrow);
+  const panel=document.createElement('div');
+  panel.className='ssel-panel';
+  document.body.appendChild(panel);
+  function entries(){
+    const out=[];
+    Array.from(sel.children).forEach(ch=>{
+      if(ch.tagName==='OPTGROUP') Array.from(ch.children).forEach(o=>out.push({o,g:ch.label}));
+      else if(ch.tagName==='OPTION') out.push({o:ch,g:null});
+    });
+    return out;
+  }
+  function place(){
+    const r=input.getBoundingClientRect();
+    panel.style.left=r.left+'px'; panel.style.top=(r.bottom+4)+'px'; panel.style.width=r.width+'px';
+  }
+  function closePanel(){ panel.classList.remove('open'); wrap.classList.remove('open'); }
+  function renderPanel(q){
+    q=(q||'').toLowerCase();
+    const rows=entries().filter(e=>e.o.text.toLowerCase().includes(q));
+    let html='', lastG;
+    rows.forEach(e=>{
+      if(e.g!==lastG){ html+=`<div class="ssel-group">${e.g}</div>`; lastG=e.g; }
+      const cls=e.o.value===sel.value?' sel':'';
+      html+=`<div class="ssel-opt${cls}" data-v="${e.o.value.replace(/"/g,'&quot;')}">${e.o.text}</div>`;
+    });
+    panel.innerHTML = rows.length ? html : '<div class="ssel-empty">No matches</div>';
+    panel.querySelectorAll('.ssel-opt').forEach(el=>{
+      el.onmousedown=ev=>{
+        ev.preventDefault();
+        sel.value=el.dataset.v;
+        sel.dispatchEvent(new Event('change'));
+        input.value=selLabel(sel);
+        closePanel();
+      };
+    });
+  }
+  function openPanel(){ place(); renderPanel(''); panel.classList.add('open'); wrap.classList.add('open'); }
+  input.addEventListener('focus', ()=>{ openPanel(); input.select(); });
+  input.addEventListener('input', ()=>{ place(); renderPanel(input.value); panel.classList.add('open'); wrap.classList.add('open'); });
+  input.addEventListener('blur', ()=>setTimeout(()=>{ closePanel(); input.value=selLabel(sel); },120));
+  input.addEventListener('keydown', e=>{ if(e.key==='Escape') input.blur(); });
+  window.addEventListener('resize', ()=>{ if(panel.classList.contains('open')) place(); });
+  input.value=selLabel(sel);
+  SSEL[id]={sel,input,panel};
+}
+['ucSel','zoneSel','typeSel','dateSel','empSel','anomalySel'].forEach(enhanceSearchableSelect);
+document.querySelector('.side').addEventListener('scroll', ()=>{
+  Object.values(SSEL).forEach(s=>{ if(s.panel.classList.contains('open')){
+    const r=s.input.getBoundingClientRect();
+    s.panel.style.left=r.left+'px'; s.panel.style.top=(r.bottom+4)+'px'; s.panel.style.width=r.width+'px';
+  }});
+}, {passive:true});
+
 document.getElementById('reset').onclick=()=>{
-  state={district:null,status:'all',recent:'all',conn:'all',uc:'',type:'',q:'',
-    date:'',timeFrom:'',timeTo:'',sort:'distance_km',dir:-1};
+  // "Reset filters" clears every filter, including the employee dropdown --
+  // roster-scoped mode is a mode switch, not a same-tier filter, so it's
+  // the one thing left alone here, with its own explicit toggle-off in the top bar.
+  state={town:null,status:'all',recent:'all',conn:'all',uc:'',zone:'',type:'',q:'',
+    date:'',timeFrom:'',timeTo:'',sort:'distance_km',dir:-1,
+    rosterScoped:state.rosterScoped, employee:'', anomaly:''};
   document.getElementById('typeSel').value=''; document.getElementById('search').value='';
-  document.getElementById('ucSel').value=''; document.getElementById('dateSel').value='';
+  document.getElementById('topSearch').value='';
+  document.getElementById('ucSel').value=''; document.getElementById('zoneSel').value='';
+  document.getElementById('dateSel').value='';
   document.getElementById('timeFrom').value=''; document.getElementById('timeTo').value='';
+  document.getElementById('empSel').value=''; document.getElementById('anomalySel').value='';
+  ['typeSel','ucSel','zoneSel','dateSel','empSel','anomalySel'].forEach(syncSSel);
   document.querySelectorAll('#statusChips .chip').forEach(x=>x.classList.toggle('on',x.dataset.s==='all'));
   document.querySelectorAll('#recentChips .chip').forEach(x=>x.classList.toggle('on',x.dataset.r==='all'));
   document.querySelectorAll('#connChips .chip').forEach(x=>x.classList.toggle('on',x.dataset.c==='all'));
