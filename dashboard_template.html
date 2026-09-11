@@ -81,6 +81,12 @@
   .content{min-width:0;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:14px}
   #map{width:100%;height:360px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
   .map-wrap{position:relative}
+  .track-tools{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+  .track-tools input{flex:1 1 260px;min-width:180px}
+  .track-tools button{flex:0 0 auto}
+  .track-status{font-size:11.5px;color:var(--mut);margin-bottom:8px;line-height:1.5}
+  .track-status b{color:var(--ink)}
+  .track-status.err{color:#dc2626}
   .map-badge{position:absolute;top:12px;left:12px;z-index:1000;max-width:calc(100% - 24px);
         background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border:1px solid var(--line);
         border-left:3px solid var(--accent);border-radius:9px;padding:7px 12px;
@@ -569,6 +575,14 @@
           <b>Map</b>
           <span>coverage, markers, and popups</span>
         </div>
+        <div class="track-tools">
+          <input id="trackSearch" list="trackVehicleList" placeholder="Track a vehicle's full route today (type its number)…">
+          <datalist id="trackVehicleList"></datalist>
+          <button class="reset" id="trackSearchBtn">Show route</button>
+          <button class="reset" id="trackSearchClear">Clear</button>
+          <button class="reset accent-btn" id="showAllTracksBtn">Show all LR tracks</button>
+        </div>
+        <div class="track-status" id="trackStatus" style="display:none"></div>
         <div class="map-wrap">
           <div id="map"></div>
           <div class="map-badge" id="mapBadge" style="display:none"></div>
@@ -715,6 +729,34 @@ const ZONE_TOWN = {};
 function zoneSortKey(z){ const m = /Zone-(\d+)/.exec(z); return m ? +m[1] : 0; }
 const zoneOptions = Object.keys(ZONE_TO_UCS).sort((a,b)=>zoneSortKey(a)-zoneSortKey(b))
   .map(z => ({value:z, label:`${z} · ${ZONE_TOWN[z]} (${ZONE_TO_UCS[z].size} UC${ZONE_TO_UCS[z].size===1?'':'s'})`}));
+// Per-vehicle coordinate history for the day (auto_track_lwmc_history.py,
+// via the tracking site's own "Vehicle History" feature), keyed by the same
+// normalized vkey every point record already carries. Each entry is
+// [lat, lon, time, speed], downsampled per vehicle at build time. When the
+// export is a single calendar day (DATA.vehicle_tracks_date set), `time` is
+// compacted to "HH:MM:SS" to roughly halve the embedded JSON size -- use
+// trackPointTime() below rather than reading point[2] directly.
+const TRACKS = DATA.vehicle_tracks || {};
+const TRACKS_DATE = DATA.vehicle_tracks_date || null;
+function trackPointTime(raw){
+  return TRACKS_DATE ? `${TRACKS_DATE} ${raw}` : raw.replace('T',' ');
+}
+// straight-line (great-circle) distance between two lat/lon points, in km
+function haversineKm(lat1, lon1, lat2, lon2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+// total distance covered by a vehicle today, summed leg-by-leg over its
+// actual GPS history points (not the odometer/device-reported figure) --
+// an approximation since it's straight lines between pings, not road path.
+function trackDistanceKm(pts){
+  let d = 0;
+  for(let i=1;i<pts.length;i++) d += haversineKm(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
+  return d;
+}
 const EMPLOYEES = (DATA.employees || []).map(e => ({...e, uc_set: new Set(e.resolved_ucs)}));
 const EMPLOYEE_BY_ID = new Map(EMPLOYEES.map(e => [e.id, e]));
 const ROSTER_UC_SET = new Set(DATA.roster_ucs || []);
@@ -833,7 +875,13 @@ const ucLayer = L.geoJSON(DATA.ucs,{
 // on hover) whenever a Zone/UC/Employee filter narrows the view down to a
 // specific, small set -- with 274 UCs city-wide, always-on labels would
 // just be noise, so this only kicks in once something has scoped the view.
+// set by the track-search feature below to whichever UC the tracked
+// vehicle currently sits in -- takes priority over the Zone/UC/Employee
+// filters so the map always highlights the right UC for the vehicle you
+// searched, not a leftover filter selection.
+let trackedVehicleUc = null;
 function highlightedUcSet(){
+  if(trackedVehicleUc) return new Set([trackedVehicleUc]);
   if(state.zone) return ZONE_TO_UCS[state.zone] || new Set();
   if(state.employee){
     const emp = EMPLOYEE_BY_ID.get(state.employee);
@@ -862,6 +910,221 @@ function updateUcLabels(){
 }
 
 const markerLayer = L.layerGroup().addTo(map);
+
+// ---- vehicle route track (today's coordinate history) ----
+const trackLayer = L.layerGroup().addTo(map);
+function clearVehicleTrack(){ trackLayer.clearLayers(); }
+function showVehicleTrack(vkey){
+  if(allTracksShown) hideAllTracks();
+  clearVehicleTrack();
+  const pts = TRACKS[vkey];
+  if(!pts || !pts.length) return false;
+  const latlngs = pts.map(p=>[p[0],p[1]]);
+  L.polyline(latlngs, {color:'#ea580c', weight:3, opacity:.85}).addTo(trackLayer);
+  L.circleMarker(latlngs[0], {radius:6, weight:2, color:'#fff', fillColor:'#16a34a', fillOpacity:1})
+    .bindTooltip(`Start · ${trackPointTime(pts[0][2])}`).addTo(trackLayer);
+  const lastIdx = latlngs.length - 1;
+  L.circleMarker(latlngs[lastIdx], {radius:6, weight:2, color:'#fff', fillColor:'#dc2626', fillOpacity:1})
+    .bindTooltip(`Latest · ${trackPointTime(pts[lastIdx][2])}`).addTo(trackLayer);
+  const bounds = L.latLngBounds(latlngs);
+  if(bounds.isValid()) map.fitBounds(bounds.pad(0.15));
+  return true;
+}
+
+// ---- show every LR's route at once, as a single bulk overlay -- distinct
+// from (and mutually exclusive with) the single-vehicle track-search above.
+// Each route is thinned further than the 250-point embedded cap since
+// drawing 1000+ full-detail routes simultaneously would be too heavy for
+// the browser; all routes are combined into ONE L.polyline call (Leaflet
+// accepts an array of line-strings) rather than one layer per vehicle, for
+// the same reason.
+const allTracksLayer = L.layerGroup();
+let allTracksShown = false;
+const ALL_TRACKS_MAX_POINTS_PER_VEHICLE = 40;
+function showAllTracks(){
+  const vkeys = Object.keys(TRACKS);
+  const statusEl = document.getElementById('trackStatus');
+  if(!vkeys.length){
+    statusEl.className = 'track-status err';
+    statusEl.style.display = '';
+    statusEl.textContent = 'No route history data available -- run the pipeline with a vehicle-tracks export present.';
+    return;
+  }
+  clearVehicleTrack();
+  searchTrackActive = false;
+  trackShownFor = null;
+  allTracksLayer.clearLayers();
+  const lines = [];
+  let allBounds = null;
+  for(const vkey of vkeys){
+    const pts = TRACKS[vkey];
+    if(!pts || pts.length < 2) continue;
+    let sampled = pts;
+    if(pts.length > ALL_TRACKS_MAX_POINTS_PER_VEHICLE){
+      const step = (pts.length - 1) / (ALL_TRACKS_MAX_POINTS_PER_VEHICLE - 1);
+      sampled = Array.from({length: ALL_TRACKS_MAX_POINTS_PER_VEHICLE}, (_, i) => pts[Math.round(i * step)]);
+    }
+    const latlngs = sampled.map(p=>[p[0], p[1]]);
+    lines.push(latlngs);
+  }
+  L.polyline(lines, {color:'#2563eb', weight:1, opacity:.35}).addTo(allTracksLayer);
+  allTracksLayer.addTo(map);
+  const bounds = L.latLngBounds(lines.flat());
+  if(bounds.isValid()) map.fitBounds(bounds.pad(0.1));
+  allTracksShown = true;
+  const btn = document.getElementById('showAllTracksBtn');
+  if(btn) btn.textContent = `Hide all LR tracks (${lines.length})`;
+  statusEl.className = 'track-status';
+  statusEl.style.display = '';
+  statusEl.textContent = `Showing ${fmt(lines.length)} LR routes at once${TRACKS_DATE?` on ${TRACKS_DATE}`:''} (thinned to ${ALL_TRACKS_MAX_POINTS_PER_VEHICLE} points each). Click "Hide all LR tracks" or search a single vehicle to return to one-route view.`;
+}
+function hideAllTracks(){
+  allTracksLayer.clearLayers();
+  map.removeLayer(allTracksLayer);
+  allTracksShown = false;
+  const btn = document.getElementById('showAllTracksBtn');
+  if(btn) btn.textContent = 'Show all LR tracks';
+}
+function toggleAllTracks(){
+  if(allTracksShown){ hideAllTracks(); return; }
+  showAllTracks();
+}
+document.getElementById('showAllTracksBtn').onclick = toggleAllTracks;
+
+// ---- track-by-search (any vehicle with history today, independent of the
+// live-position filters -- a vehicle can have a full day's route even if
+// it's not currently reporting/visible in the filtered table above) ----
+let searchTrackActive = false;
+let searchAutoTrackActive = false;
+// while true, the map is isolated to just the track-search route -- the
+// regular fleet marker dots stay hidden (even across unrelated re-renders)
+// until the track search is cleared.
+let trackSearchIsolated = false;
+const VKEY_TO_VEHICLE = new Map();
+const VKEY_TO_POINT = new Map();
+POINTS.forEach(p=>{
+  if(p.vkey && p.vehicle) VKEY_TO_VEHICLE.set(p.vkey, p.vehicle);
+  if(p.vkey && !VKEY_TO_POINT.has(p.vkey)) VKEY_TO_POINT.set(p.vkey, p);
+});
+const TRACK_OPTIONS = Object.keys(TRACKS)
+  .map(vk=>({vkey:vk, label: VKEY_TO_VEHICLE.get(vk) || vk}))
+  .sort((a,b)=>a.label.localeCompare(b.label));
+document.getElementById('trackVehicleList').innerHTML =
+  TRACK_OPTIONS.map(o=>`<option value="${o.label}">`).join('');
+function normKeyJs(s){ return (s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+function trackSearchGo(){
+  const raw = document.getElementById('trackSearch').value.trim();
+  const statusEl = document.getElementById('trackStatus');
+  if(!raw){ statusEl.style.display='none'; return; }
+  const nk = normKeyJs(raw);
+  let match = TRACK_OPTIONS.find(o=>o.vkey===nk || o.label.toUpperCase()===raw.toUpperCase());
+  if(!match){
+    const hits = TRACK_OPTIONS.filter(o=>o.label.toUpperCase().includes(raw.toUpperCase()) || o.vkey.includes(nk));
+    if(hits.length===1) match = hits[0];
+    else if(hits.length>1){
+      statusEl.className='track-status';
+      statusEl.style.display='';
+      statusEl.innerHTML = `${hits.length} vehicles match "${raw}" — be more specific: ${hits.slice(0,6).map(h=>h.label).join(', ')}${hits.length>6?', …':''}`;
+      return;
+    }
+  }
+  if(!match){
+    statusEl.className='track-status err';
+    statusEl.style.display='';
+    statusEl.textContent = `No route history found for "${raw}".`;
+    return;
+  }
+  const pts = TRACKS[match.vkey];
+  showVehicleTrack(match.vkey);
+  searchTrackActive = true;
+  trackShownFor = match.label;
+  trackSearchIsolated = true;
+  markerLayer.clearLayers();
+  const first = trackPointTime(pts[0][2]).slice(0,16);
+  const last = trackPointTime(pts[pts.length-1][2]).slice(0,16);
+  const p = VKEY_TO_POINT.get(match.vkey);
+  const ucBit = p
+    ? (p.uc ? `${p.uc} · ${p.uc_town||'—'}${p.uc_zone?` · ${p.uc_zone}`:''}` : 'Outside UC')
+    : 'UC unknown';
+  const assignedBit = p && p.assigned_town ? ` · assigned to ${p.assigned_town}` : '';
+  statusEl.className='track-status';
+  statusEl.style.display='';
+  statusEl.innerHTML = `<b>${match.label}</b> — ${fmt(pts.length)} route points${TRACKS_DATE?` on ${TRACKS_DATE}`:''} · ${first} → ${last}<br>${ucBit}${assignedBit}`;
+
+  // highlight the vehicle's own UC boundary on the map (instead of whatever
+  // Zone/UC filter happened to be selected before) and widen the view so
+  // that UC polygon is visible alongside the route, even if the vehicle has
+  // since wandered far outside it.
+  trackedVehicleUc = (p && p.uc) || null;
+  updateUcLabels();
+  if(trackedVehicleUc){
+    let ucBounds = null;
+    ucLayer.eachLayer(l=>{
+      if(l.feature && l.feature.properties && l.feature.properties.uc === trackedVehicleUc){
+        ucBounds = l.getBounds();
+      }
+    });
+    if(ucBounds && ucBounds.isValid()){
+      const routeBounds = L.latLngBounds(pts.map(pt=>[pt[0],pt[1]]));
+      map.fitBounds(routeBounds.extend(ucBounds).pad(0.15));
+    }
+  }
+}
+function trackSearchClear(){
+  document.getElementById('trackSearch').value='';
+  document.getElementById('trackStatus').style.display='none';
+  clearVehicleTrack();
+  searchTrackActive = false;
+  trackShownFor = null;
+  trackSearchIsolated = false;
+  trackedVehicleUc = null;
+  render();
+}
+// ---- search-driven map isolation: whenever the top/main search box
+// matches at least one vehicle by number, the map shows ONLY that single
+// vehicle (never the rest of the fleet) and draws its route automatically.
+// Table/KPIs keep showing every match so you can still browse and click a
+// different one of several candidates; the map follows whichever vehicle
+// is picked (state.selected) or the best automatic match otherwise.
+function primarySearchVehicle(rows){
+  if(!state.q) return null;
+  const qNorm = normKeyJs(state.q);
+  const candidates = rows.filter(p => (p.vehicle||'').toLowerCase().includes(state.q));
+  if(!candidates.length) return null;
+  const selectedMatch = state.selected && candidates.find(p=>p.vehicle===state.selected);
+  if(selectedMatch) return selectedMatch;
+  candidates.sort((a,b)=>{
+    const ae = normKeyJs(a.vehicle)===qNorm, be = normKeyJs(b.vehicle)===qNorm;
+    if(ae!==be) return ae ? -1 : 1;
+    return (a.vehicle||'').length - (b.vehicle||'').length || (a.vehicle||'').localeCompare(b.vehicle||'');
+  });
+  return candidates[0];
+}
+function updateSearchAutoTrack(mapVehicle){
+  if(mapVehicle){
+    if(trackShownFor !== mapVehicle.vehicle){
+      const shown = mapVehicle.vkey ? showVehicleTrack(mapVehicle.vkey) : false;
+      if(!shown && mapVehicle.lat!=null && mapVehicle.lon!=null){
+        map.setView([mapVehicle.lat, mapVehicle.lon], Math.max(map.getZoom(), 15));
+      }
+      trackShownFor = mapVehicle.vehicle;
+    }
+    searchTrackActive = true;
+    searchAutoTrackActive = true;
+    trackedVehicleUc = mapVehicle.uc || null;
+  } else if(searchAutoTrackActive){
+    clearVehicleTrack();
+    searchAutoTrackActive = false;
+    searchTrackActive = false;
+    trackShownFor = null;
+    trackedVehicleUc = null;
+  }
+}
+document.getElementById('trackSearchBtn').onclick = trackSearchGo;
+document.getElementById('trackSearchClear').onclick = trackSearchClear;
+document.getElementById('trackSearch').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); trackSearchGo(); }
+});
 
 function fmt(n,d=0){ return (n==null||isNaN(n))?'—':Number(n).toLocaleString(undefined,{maximumFractionDigits:d,minimumFractionDigits:d}); }
 
@@ -909,6 +1172,11 @@ function filtered(opts){
   opts = opts || {};
   const from = toMinutes(state.timeFrom), to = toMinutes(state.timeTo);
   const searchUcs = state.q ? searchMatchedUcs(state.q) : null;
+  // an exact vehicle-number match (e.g. typing "LR-1692" or "1692" in full)
+  // takes over the search completely -- only that one vehicle should show,
+  // not every other vehicle whose number happens to contain the same digits.
+  const qNorm = state.q ? normKeyJs(state.q) : '';
+  const exactVehicleSearch = qNorm ? POINTS.some(pp => normKeyJs(pp.vehicle) === qNorm) : false;
   const anomalyDef = (!opts.skipAnomaly && state.anomaly) ? ANOMALY_TYPES.find(a=>a.key===state.anomaly) : null;
   return POINTS.filter(p=>{
     if(state.town && p.uc_town!==state.town) return false;
@@ -937,8 +1205,10 @@ function filtered(opts){
     }
     if(state.type && p.vehicle_type!==state.type) return false;
     if(state.q){
-      const vehicleMatch = (p.vehicle||'').toLowerCase().includes(state.q);
-      const employeeMatch = searchUcs && searchUcs.size && p.uc && searchUcs.has(p.uc);
+      const vehicleMatch = exactVehicleSearch
+        ? normKeyJs(p.vehicle) === qNorm
+        : (p.vehicle||'').toLowerCase().includes(state.q);
+      const employeeMatch = !exactVehicleSearch && searchUcs && searchUcs.size && p.uc && searchUcs.has(p.uc);
       if(!vehicleMatch && !employeeMatch) return false;
     }
     if(anomalyDef && !anomalyDef.test(p)) return false;
@@ -964,7 +1234,7 @@ function matchingEmployees(q){
     return e.name.toLowerCase().includes(q) || roleLabel.includes(q) || e.role.toLowerCase().includes(q);
   });
 }
-function updateMapBadge(rows){
+function updateMapBadge(rows, mapVehicle){
   const badge = document.getElementById('mapBadge');
   let title = null, sub = '';
   if(state.employee){
@@ -973,6 +1243,12 @@ function updateMapBadge(rows){
       title = `${emp.name} — ${ROLE_LABEL[emp.role]||emp.role}`;
       sub = emp.resolved_ucs.length ? `${emp.resolved_ucs.length} UC${emp.resolved_ucs.length===1?'':'s'} · ${fmt(rows.length)} vehicles shown` : 'unresolved area';
     }
+  } else if(mapVehicle){
+    const trackPts = mapVehicle.vkey ? TRACKS[mapVehicle.vkey] : null;
+    const otherMatches = rows.filter(p=>(p.vehicle||'').toLowerCase().includes(state.q) && p.vehicle!==mapVehicle.vehicle).length;
+    title = `${mapVehicle.vehicle} — tracking`;
+    sub = (trackPts && trackPts.length ? `${fmt(trackPts.length)} route points today` : 'no route history today') +
+      (otherMatches ? ` · ${fmt(otherMatches)} more match in table below, click to switch` : '');
   } else if(state.q){
     const matches = matchingEmployees(state.q);
     if(matches.length === 1){
@@ -1373,13 +1649,23 @@ function drawHealth(rows){
       <div class="health-sub">${fmt(Math.round(movingPct*100))}% moving (40%) · ${fmt(Math.round(onlinePct*100))}% online (40%) · ${fmt(Math.round(batteryOkPct*100))}% battery OK (20%), from ${fmt(rows.length)} vehicles in view.</div>
     </div>`;
 }
+let trackShownFor = null;
 function drawSelected(rows){
   const chosen = rows.find(p => p.vehicle === state.selected) || rows[0];
   const hint = document.getElementById('selectedHint');
   if(!chosen){
     hint.textContent = 'click map or table';
     document.getElementById('selectedDetail').innerHTML = '<div class="detail-line"><span class="k">No vehicle selected</span><span class="v">Use the table below</span></div>';
+    if(!searchTrackActive){ clearVehicleTrack(); trackShownFor = null; }
     return;
+  }
+  if(chosen.vehicle !== trackShownFor && !searchTrackActive){
+    // selection moved on to a different vehicle -- don't leave a stale
+    // route from whichever vehicle was previously selected on the map
+    // (skipped while a standalone "track search" route is on screen, so
+    // unrelated filter re-renders don't wipe it out)
+    clearVehicleTrack();
+    trackShownFor = null;
   }
   state.selected = chosen.vehicle;
   hint.textContent = chosen.vehicle;
@@ -1399,11 +1685,40 @@ function drawSelected(rows){
     ['Last received', chosen.last_received || '—'],
     ['Age', ageLabel(chosen)],
   ];
+  const trackPts = TRACKS[chosen.vkey];
+  const isShown = trackShownFor === chosen.vehicle;
+  let routeHtml;
+  if(trackPts && trackPts.length){
+    const first = trackPointTime(trackPts[0][2]).slice(0,16);
+    const last = trackPointTime(trackPts[trackPts.length-1][2]).slice(0,16);
+    routeHtml = `
+      <div class="detail-line"><span class="k">Route points today</span><span class="v">${fmt(trackPts.length)}</span></div>
+      <div class="detail-line"><span class="k">First → last</span><span class="v">${first} → ${last}</span></div>
+      <button class="reset" id="routeToggleBtn" style="margin-top:6px">${isShown ? 'Clear route from map' : 'Show route on map'}</button>`;
+  } else {
+    routeHtml = `<div class="detail-line"><span class="k">Route today</span><span class="v">No history data for this vehicle</span></div>`;
+  }
   document.getElementById('selectedDetail').innerHTML = `
     ${details.map(d => `<div class="detail-line"><span class="k">${d[0]}</span><span class="v">${d[1]}</span></div>`).join('')}
+    <div class="sect" style="margin-top:10px">Today's route</div>
+    ${routeHtml}
     <div class="sect" style="margin-top:10px">Raw data</div>
     ${rawRecordDetailHtml(chosen)}
   `;
+  const routeBtn = document.getElementById('routeToggleBtn');
+  if(routeBtn){
+    routeBtn.onclick = () => {
+      searchTrackActive = false;
+      if(trackShownFor === chosen.vehicle){
+        clearVehicleTrack();
+        trackShownFor = null;
+      } else {
+        showVehicleTrack(chosen.vkey);
+        trackShownFor = chosen.vehicle;
+      }
+      drawSelected(rows);
+    };
+  }
 }
 function drawRail(rowsAll){
   const rail=document.getElementById('rail');
@@ -1827,6 +2142,66 @@ function buildTownTargetSheet(rows){
   });
   return out;
 }
+function buildOutOfAreaSheet(rows){
+  // vehicles whose home (assigned) town is known but who are currently
+  // working somewhere else -- pulled out into its own sheet rather than
+  // buried in the general Watchlist (which mixes in battery/offline/etc.
+  // issues that are unrelated to UC assignment).
+  const out = [['Vehicle','Assigned (home) town','Current UC','Current town','Current zone','Status','Connectivity','Distance (km)','Working (min)','Last received','Age']];
+  rows.filter(p=>p.in_assigned_area===false)
+    .sort((a,b)=>(a.assigned_town||'').localeCompare(b.assigned_town||'') || (a.vehicle||'').localeCompare(b.vehicle||''))
+    .forEach(p=>{
+      out.push([p.vehicle, p.assigned_town||'—', p.uc||'—', p.uc_town||'—', p.uc_zone||'—', p.status,
+        isOnline(p)?'Online':'Offline', Math.round((p.distance_km||0)*100)/100,
+        p.working_min!=null?Math.round(p.working_min):'', p.last_received||'', ageLabel(p)]);
+    });
+  return out;
+}
+function buildHierarchyRankingSheet(rows){
+  // ranks staff within their own hierarchy level (Tehsil Manager, Fleet
+  // Manager, Zonal Officer, AM Yard, MVI -- top to bottom per ROLE_ORDER)
+  // by total distance covered across their assigned UCs, instead of one
+  // flat list mixing every role together.
+  const out = [['Hierarchy level','Rank','Employee','Shift','Coverage (UCs)','Vehicles','Moving','Online','Total distance (km)','Avg distance (km)']];
+  ROLE_ORDER.filter(role => EMPLOYEES.some(e=>e.role===role)).forEach(role=>{
+    const ranked = EMPLOYEES.filter(e=>e.role===role).map(e=>{
+      const g = e.uc_set.size ? rows.filter(p=>p.uc && e.uc_set.has(p.uc)) : [];
+      const dist = g.reduce((s,p)=>s+(p.distance_km||0),0);
+      return {
+        name: e.name, shift: e.shift||'', coverage: e.uc_set.size, vehicles: g.length,
+        moving: g.filter(p=>p.status==='moving').length, online: g.filter(p=>isOnline(p)).length, dist,
+      };
+    }).sort((a,b)=>b.dist-a.dist);
+    ranked.forEach((e,i)=>{
+      out.push([ROLE_LABEL[role]||role, i+1, e.name, e.shift, e.coverage, e.vehicles, e.moving, e.online,
+        Math.round(e.dist*100)/100, e.vehicles ? Math.round((e.dist/e.vehicles)*100)/100 : 0]);
+    });
+  });
+  return out;
+}
+function buildRouteDistanceSheet(){
+  // GPS-derived distance for every vehicle with today's coordinate history
+  // (TRACKS is independent of the current filters, same as the "Track a
+  // vehicle" search box), alongside the device/odometer-reported distance
+  // for comparison.
+  const header = ['Vehicle','UC','Town','Route points','First seen','Last seen','GPS distance (km)','Reported distance (km)','Difference (km)'];
+  const body = Object.keys(TRACKS).map(vkey=>{
+    const pts = TRACKS[vkey];
+    if(!pts || pts.length < 2) return null;
+    const vehicle = VKEY_TO_VEHICLE.get(vkey) || vkey;
+    const point = VKEY_TO_POINT.get(vkey);
+    const gpsDist = trackDistanceKm(pts);
+    const reported = point && point.distance_km != null ? point.distance_km : null;
+    return [
+      vehicle, (point && point.uc) || '—', (point && point.uc_town) || '—', pts.length,
+      trackPointTime(pts[0][2]), trackPointTime(pts[pts.length-1][2]),
+      Math.round(gpsDist*100)/100,
+      reported != null ? Math.round(reported*100)/100 : '',
+      reported != null ? Math.round((gpsDist-reported)*100)/100 : '',
+    ];
+  }).filter(Boolean).sort((a,b)=>b[6]-a[6]);
+  return [header, ...body];
+}
 function exportExcelReport(){
   const btn = document.getElementById('xlsxReport');
   const status = document.getElementById('xlsxStatus');
@@ -1842,7 +2217,10 @@ function exportExcelReport(){
       {name:'By Zone', rows: buildZoneSheet(rows)},
       {name:'Working Hours', rows: buildHoursSheet(rows)},
       {name:'By Employee', rows: buildEmployeeSheet(rows)},
+      {name:'Hierarchy Ranking', rows: buildHierarchyRankingSheet(rows)},
       {name:'Town Targets', rows: buildTownTargetSheet(rows)},
+      {name:'Out of Assigned UC', rows: buildOutOfAreaSheet(rows)},
+      {name:'GPS Route Distance', rows: buildRouteDistanceSheet()},
       {name:'Watchlist', rows: buildWatchlistSheet(rows)},
       {name:'Vehicle Detail', rows: buildDetailSheet(rows)},
     ];
@@ -1885,13 +2263,20 @@ function updateRosterUI(){
 // ---- render ----
 function render(fit=false){
   const rows=filtered();
+  // when the search box matches vehicle(s) by number, the map/track/detail
+  // panel lock onto just one of them (mapVehicle) instead of the whole
+  // filtered set -- table/KPIs below keep using the full `rows` so browsing
+  // and analytics are unaffected.
+  const mapVehicle = primarySearchVehicle(rows);
+  const mapRows = mapVehicle ? [mapVehicle] : rows;
+  updateSearchAutoTrack(mapVehicle);
   updateRosterUI();
   drawKpis(rows); drawRail(rows); buildHead(); drawDateBlock(rows);
-  drawOverview(rows); drawHealth(rows); drawPredictions(rows); drawSelected(rows);
+  drawOverview(rows); drawHealth(rows); drawPredictions(rows); drawSelected(mapRows);
   drawStatCards(rows); drawComboChart(rows); drawDonuts(rows); drawRecencyFunnel(rows); drawLeaderboard(rows);
   drawTownTargets(rows); drawAssignedDonut(rows); drawAnomalies(rows);
   drawZoneBoard(rows); drawHoursTable(rows);
-  drawMarkers(rows); drawTable(rows); updateMapBadge(rows); updateUcLabels();
+  drawMarkers(trackSearchIsolated ? [] : mapRows); drawTable(rows); updateMapBadge(rows, mapVehicle); updateUcLabels();
   document.getElementById('tcount').textContent = fmt(rows.length)+' shown';
   const timeBit = (state.timeFrom || state.timeTo) ? ` · ${state.timeFrom||'00:00'}-${state.timeTo||'23:59'}` : '';
   const empBit = state.employee ? ` · ${(EMPLOYEE_BY_ID.get(state.employee)||{}).name || ''}` : '';

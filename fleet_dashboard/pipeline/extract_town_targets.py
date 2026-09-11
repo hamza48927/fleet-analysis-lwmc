@@ -2,35 +2,31 @@
 """
 Extract per-town fleet TARGET figures, and a per-vehicle registry lookup,
 from "Lahore Fleet+LRs.xlsx" -- the LWMC fleet establishment roster -- into
-a clean reference file the dashboard build can read.
+a clean reference file the dashboard build reads.
 
-This supersedes an earlier version of this script that read "vehicle
-data.xlsx" (an hourly control-room log). Those hourly-log target numbers
-turned out to be wrong -- confirmed by the user and cross-checked here:
-comparing them to live GPS-deployed counts landed in a nonsensical 180-450%
-for the whole fleet, or an implausible 0-118% even when narrowed to
-Loader-Rickshaw-only. "Lahore Fleet+LRs.xlsx" is a flat per-vehicle
-registry (Sr No / Vehicle ID / Fuel ID / Vehicle Category / Town), not an
-hourly snapshot, and its per-vehicle Vehicle ID column matches ~96% of the
-live VTMS "vehicle" field directly -- so instead of only producing
-town-level aggregates, this script also emits a vehicle_id -> {category,
-town} lookup so build_master.py can join each live vehicle to its REAL
-registered category and town, which is far more reliable than VTMS's own
-vehicle_type field (blank for ~63% of live vehicles).
+"Lahore Fleet+LRs.xlsx" is a flat per-vehicle registry (Sr No / Vehicle ID /
+Fuel ID / Vehicle Category / Town), not an hourly snapshot, and its
+per-vehicle Vehicle ID column matches ~96% of the live VTMS "vehicle" field
+directly -- so this also emits a vehicle_id -> {category, town} lookup so
+build_master.py can join each live vehicle to its REAL registered category
+and town, which is far more reliable than VTMS's own vehicle_type field
+(blank for ~63% of live vehicles).
 
 Run this again only if "Lahore Fleet+LRs.xlsx" is replaced with an updated
 version (it is NOT part of the daily VTMS build cycle -- build_master.py
 just reads the JSON this script produces).
 Output: Reference Documents/town_targets.json
+
+Run with:  python -m fleet_dashboard.pipeline.extract_town_targets
 """
+from __future__ import annotations
+
 import json
-import pathlib
-from collections import Counter, defaultdict
+from collections import Counter
 
 import openpyxl
 
-SRC_XLSX = "Lahore Fleet+LRs.xlsx"
-OUT_JSON = "Reference Documents/town_targets.json"
+from .. import config
 
 # The registry spells this one town differently than lahore_ucs.geojson;
 # normalize so the dashboard can join target vs. live-GPS-actual directly
@@ -52,8 +48,8 @@ def norm_town(s):
 
 
 def norm_vehicle_id(s):
-    """Same normalization build_master.py's norm_key() applies to VTMS
-    vehicle numbers, so the two can be joined reliably regardless of
+    """Same normalization data/core.py's norm_key() applies to VTMS vehicle
+    numbers, so the two can be joined reliably regardless of
     hyphen/space formatting differences."""
     if not isinstance(s, str):
         return None
@@ -61,7 +57,11 @@ def norm_vehicle_id(s):
 
 
 def main():
-    wb = openpyxl.load_workbook(SRC_XLSX, data_only=True)
+    src = config.fleet_registry_xlsx()
+    if not src.exists():
+        raise SystemExit(f"Fleet registry workbook not found: {src}")
+
+    wb = openpyxl.load_workbook(src, data_only=True)
     ws = wb['Sheet1']
 
     vehicles = {}          # normalized vehicle id -> {category, town, raw_id}
@@ -118,7 +118,7 @@ def main():
             print(f"  {c['vehicle_id']}: kept {c['kept']}, dropped {c['dropped']}")
 
     out = {
-        'source_file': SRC_XLSX,
+        'source_file': src.name,
         'note': ("Per-town fleet targets and a per-vehicle registry lookup, extracted from "
                  "the LWMC fleet establishment roster (Lahore Fleet+LRs.xlsx) -- a flat "
                  "per-vehicle list (Vehicle ID / Vehicle Category / Town), not an hourly "
@@ -128,12 +128,13 @@ def main():
                  "category/town by Vehicle ID, which is far more reliable than VTMS's own "
                  "vehicle_type field (frequently blank)."),
         'towns': towns,
-        'vehicles': {k: {'category': v['category'], 'town': v['town']} for k, v in vehicles.items()},
+        'vehicles': {k: {'category': v['category'], 'town': v['town'], 'raw_id': v['raw_id']}
+                     for k, v in vehicles.items()},
         '_conflicts': conflicts,
     }
-    pathlib.Path('Reference Documents').mkdir(exist_ok=True)
-    json.dump(out, open(OUT_JSON, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
-    print(f"\nWrote {OUT_JSON}")
+    config.TOWN_TARGETS_JSON.parent.mkdir(exist_ok=True)
+    json.dump(out, open(config.TOWN_TARGETS_JSON, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
+    print(f"\nWrote {config.TOWN_TARGETS_JSON}")
 
 
 if __name__ == '__main__':

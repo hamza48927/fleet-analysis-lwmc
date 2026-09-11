@@ -1,31 +1,34 @@
+"""
+Map & Analytics tab: embeds the existing Leaflet/HTML fleet dashboard
+(LWMC_Fleet_Dashboard.html) inside a QWebEngineView, re-splicing in the
+freshest dashboard_data.json at launch so this tab doesn't go stale even if
+the HTML file on disk was last re-embedded a few builds ago.
+
+This is the same approach the old standalone fleet_dashboard_app.py used
+(kept here, folded into the unified dashboard, instead of as its own
+separate desktop app) -- including the QWebChannel bridge that lets the
+page's own "Export .xlsx" button save straight to the reports/ folder
+instead of going through the browser's download prompt.
+"""
 from __future__ import annotations
 
 import base64
 import json
 import re
-import sys
-from pathlib import Path
 
-from PySide6.QtCore import QUrl
-from PySide6.QtCore import QObject, Slot
-from PySide6.QtWidgets import QApplication, QMainWindow
-from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineDownloadRequest
-from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtCore import QObject, QUrl, Slot
 from PySide6.QtWebChannel import QWebChannel
+from PySide6.QtWebEngineCore import QWebEngineDownloadRequest, QWebEngineSettings
+from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from .. import config
 
-ROOT = Path(__file__).resolve().parent
-HTML_PATH = ROOT / "LWMC_Fleet_Dashboard.html"
-DATA_PATH = ROOT / "dashboard_data.json"
-RUNTIME_HTML_PATH = ROOT / "_runtime_dashboard.html"
+HTML_PATH = config.PROJECT_ROOT / "LWMC_Fleet_Dashboard.html"
+DATA_PATH = config.PROJECT_ROOT / "dashboard_data.json"
+RUNTIME_HTML_PATH = config.PROJECT_ROOT / "_runtime_dashboard.html"
 
-
-def load_dashboard_html() -> str:
-    html = HTML_PATH.read_text(encoding="utf-8")
-    data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
-    payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-
-    fallback = """
+_LEAFLET_FALLBACK_JS = """
 (function () {
   if (window.L) return;
   function makeLayer() {
@@ -70,6 +73,7 @@ def load_dashboard_html() -> str:
     },
     layerGroup() { return makeLayer(); },
     circleMarker() { return makeLayer(); },
+    polyline() { return makeLayer(); },
     latLngBounds(points) {
       return {
         isValid() { return Array.isArray(points) && points.length > 0; },
@@ -80,11 +84,18 @@ def load_dashboard_html() -> str:
 })();
 """
 
+
+def _load_dashboard_html() -> str:
+    html = HTML_PATH.read_text(encoding="utf-8")
+    data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
+    payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+
     pattern = r"const DATA\s*=\s*\{.*?\};"
-    replacement = f"{fallback}\nconst DATA = {payload};"
+    replacement = f"{_LEAFLET_FALLBACK_JS}\nconst DATA = {payload};"
     updated, count = re.subn(pattern, replacement, html, count=1, flags=re.S)
     if count != 1:
-        raise RuntimeError("Could not find dashboard data block in LWMC_Fleet_Dashboard.html")
+        raise RuntimeError(f"Could not find dashboard data block in {HTML_PATH.name}")
+
     updated = updated.replace(
         '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"\n'
         '        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>',
@@ -146,17 +157,18 @@ def load_dashboard_html() -> str:
     return updated
 
 
-class DashboardBridge(QObject):
-    def __init__(self, root: Path) -> None:
+class _DashboardBridge(QObject):
+    def __init__(self, root) -> None:
         super().__init__()
         self._root = root.resolve()
 
     @Slot(str, str, result=bool)
     def saveXlsx(self, base64_payload: str, filename: str) -> bool:
         try:
-            safe_name = Path(filename).name
-            target = (self._root / safe_name).resolve()
-            if self._root not in target.parents and target != self._root:
+            config.REPORTS_DIR.mkdir(exist_ok=True)
+            safe_name = __import__("pathlib").Path(filename).name
+            target = (config.REPORTS_DIR / safe_name).resolve()
+            if config.REPORTS_DIR.resolve() not in target.parents and target != config.REPORTS_DIR.resolve():
                 return False
             target.write_bytes(base64.b64decode(base64_payload))
             return True
@@ -164,55 +176,83 @@ class DashboardBridge(QObject):
             return False
 
 
-class DashboardWindow(QMainWindow):
-    def __init__(self) -> None:
-        super().__init__()
-        self.setWindowTitle("LWMC Fleet Dashboard")
-        self.resize(1600, 980)
+class MapTab(QWidget):
+    """Wraps the QWebEngineView + QWebChannel bridge in a QWidget so it can
+    be dropped straight into the main window's tab bar. Call reload() any
+    time dashboard_data.json / LWMC_Fleet_Dashboard.html may have changed
+    (e.g. after picking new data sources) to refresh in place -- the view
+    is created lazily on the first reload() that finds both files present,
+    so this also recovers from "files missing at startup"."""
 
-        self.view = QWebEngineView(self)
-        self.view.settings().setAttribute(
-            QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls,
-            True,
-        )
-        self.setCentralWidget(self.view)
-        self.view.page().profile().downloadRequested.connect(self._handle_download)
-        self._channel = QWebChannel(self.view.page())
-        self._bridge = DashboardBridge(ROOT)
-        self._channel.registerObject("dashboardBridge", self._bridge)
-        self.view.page().setWebChannel(self._channel)
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.view: QWebEngineView | None = None
+        self._channel = None
+        self._bridge = None
 
-        html = load_dashboard_html()
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+
+        self._missing_label = QLabel()
+        self._missing_label.setStyleSheet("padding:24px; font-size:13px; color:#8a5a2a;")
+        self._missing_label.setWordWrap(True)
+        self._layout.addWidget(self._missing_label)
+
+        self.reload()
+
+    def reload(self) -> None:
+        """Re-splices the freshest dashboard_data.json into the HTML and
+        reloads the page (or, the first time both files are present,
+        creates the QWebEngineView)."""
+        if not HTML_PATH.exists() or not DATA_PATH.exists():
+            missing = HTML_PATH.name if not HTML_PATH.exists() else DATA_PATH.name
+            self._missing_label.setText(
+                f"Map & Analytics tab needs {missing} at the project root.\n"
+                f"Import a VTMS Export above, or run: python -m fleet_dashboard.pipeline.build_master"
+            )
+            self._missing_label.show()
+            if self.view is not None:
+                self.view.hide()
+            return
+
+        try:
+            html = _load_dashboard_html()
+        except Exception as e:
+            self._missing_label.setText(
+                f"Map & Analytics tab failed to load {HTML_PATH.name}/{DATA_PATH.name}:\n{e}\n\n"
+                f"Try re-running: python -m fleet_dashboard.pipeline.build_master"
+            )
+            self._missing_label.show()
+            if self.view is not None:
+                self.view.hide()
+            return
+
+        self._missing_label.hide()
+
+        if self.view is None:
+            self.view = QWebEngineView(self)
+            self.view.settings().setAttribute(
+                QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True,
+            )
+            self.view.page().profile().downloadRequested.connect(self._handle_download)
+            self._channel = QWebChannel(self.view.page())
+            self._bridge = _DashboardBridge(config.PROJECT_ROOT)
+            self._channel.registerObject("dashboardBridge", self._bridge)
+            self.view.page().setWebChannel(self._channel)
+            # Native HTML <select> popups in QWebEngineView occasionally fail
+            # to open on click if the view hasn't received keyboard focus yet
+            # -- easy to hit right after the tab first shows. Re-grabbing
+            # focus once the page has actually finished loading is the
+            # standard mitigation.
+            self.view.page().loadFinished.connect(lambda ok: self.view.setFocus())
+            self._layout.addWidget(self.view)
+        else:
+            self.view.show()
+
         RUNTIME_HTML_PATH.write_text(html, encoding="utf-8")
-        # Native HTML <select> popups in QWebEngineView occasionally fail to
-        # open on click if the view hasn't actually received keyboard focus
-        # yet -- easy to hit right after the window first shows, or after
-        # switching back from another window (e.g. the Excel save dialog).
-        # Re-grabbing focus once the page has actually finished loading (not
-        # just once, at construction time) is the standard mitigation.
-        self.view.page().loadFinished.connect(lambda ok: self.view.setFocus())
         self.view.setUrl(QUrl.fromLocalFile(str(RUNTIME_HTML_PATH)))
 
     def _handle_download(self, download: QWebEngineDownloadRequest) -> None:
-        download.setDownloadDirectory(str(ROOT))
+        download.setDownloadDirectory(str(config.PROJECT_ROOT))
         download.setDownloadFileName(download.suggestedFileName())
         download.accept()
-
-    def focusInEvent(self, event) -> None:  # noqa: N802 (Qt override)
-        super().focusInEvent(event)
-        self.view.setFocus()
-
-
-def main() -> int:
-    app = QApplication(sys.argv)
-    app.setApplicationName("LWMC Fleet Dashboard")
-    window = DashboardWindow()
-    window.show()
-    window.activateWindow()
-    window.raise_()
-    window.view.setFocus()
-    return app.exec()
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
